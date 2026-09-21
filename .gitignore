@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+.DS_Store
+*.xcuserdatad
+
+# generated from project.yml by xcodegen
+MacRemote.xcodeproj/
+iOSApp/Info.plist

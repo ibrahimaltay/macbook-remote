@@ -1,0 +1,70 @@
+name: MacRemote
+options:
+  bundleIdPrefix: com.altay
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  MacbookRemote:
+    path: .
+
+targets:
+  RemoteDPad:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOSApp
+        excludes:
+          - Info.plist
+    info:
+      path: iOSApp/Info.plist
+      properties:
+        CFBundleDisplayName: Remote
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSBluetoothAlwaysUsageDescription: Used to find your Mac and send remote control button presses to it.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.altay.remotedpad
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ZRG87YTBFL
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "6.0"
+    dependencies:
+      - package: MacbookRemote
+        product: RemoteProtocol
+      - package: MacbookRemote
+        product: RemoteClientCore
+
+  MacRemote:
+    type: application
+    platform: macOS
+    sources:
+      - path: macApp
+        excludes:
+          - Info.plist
+    info:
+      path: macApp/Info.plist
+      properties:
+        CFBundleDisplayName: Mac Remote
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.utilities
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSBluetoothAlwaysUsageDescription: Used to let your iPhone connect to this Mac and send remote control button presses.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.altay.macremote
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ZRG87YTBFL
+        ENABLE_APP_SANDBOX: NO
+        SWIFT_VERSION: "6.0"
+    dependencies:
+      - package: MacbookRemote
+        product: RemoteProtocol
+      - package: MacbookRemote
+        product: RemoteServerCore
