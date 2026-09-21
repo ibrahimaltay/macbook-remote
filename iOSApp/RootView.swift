@@ -17,7 +17,7 @@ struct RootView: View {
 
             GeometryReader { proxy in
                 HStack(spacing: 0) {
-                    DPadView(model: model)
+                    DPadView(model: model, pageSwipe: swipe)
                         .frame(width: proxy.size.width)
                     TrackpadView(model: model)
                         .frame(width: proxy.size.width)

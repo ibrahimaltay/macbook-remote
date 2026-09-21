@@ -1,14 +1,19 @@
 import RemoteProtocol
 import SwiftUI
 
-struct DPadView: View {
+private enum DPadMetrics {
     static let buttonSize: CGFloat = 100
     static let spacing: CGFloat = 14
+}
 
+struct DPadView<PageSwipe: Gesture>: View {
     let model: RemoteViewModel
+    /// The same gesture the edge strips use, so the threshold and animation stay
+    /// defined in one place.
+    let pageSwipe: PageSwipe
 
     var body: some View {
-        Grid(horizontalSpacing: Self.spacing, verticalSpacing: Self.spacing) {
+        Grid(horizontalSpacing: DPadMetrics.spacing, verticalSpacing: DPadMetrics.spacing) {
             GridRow {
                 spacer
                 DPadButton(command: .up, symbol: "chevron.up", model: model)
@@ -29,10 +34,19 @@ struct DPadView: View {
         .animation(.easeOut(duration: 0.2), value: model.isConnected)
         .padding(.bottom, 64)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        // Behind the grid, so the buttons keep their own press-and-hold drags and
+        // everything around them pages instead.
+        .background {
+            Color.clear
+                .contentShape(.rect)
+                .gesture(pageSwipe)
+        }
     }
 
     private var spacer: some View {
-        Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+        Color.clear
+            .gridCellUnsizedAxes([.horizontal, .vertical])
+            .allowsHitTesting(false)
     }
 }
 
@@ -46,7 +60,7 @@ private struct DPadButton: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .fill(isPressed ? Color.accentColor : Color(.systemGray5))
-            .frame(width: DPadView.buttonSize, height: DPadView.buttonSize)
+            .frame(width: DPadMetrics.buttonSize, height: DPadMetrics.buttonSize)
             .overlay {
                 Image(systemName: symbol)
                     .font(.system(size: 30, weight: .semibold))
