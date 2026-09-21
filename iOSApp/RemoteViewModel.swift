@@ -58,4 +58,22 @@ final class RemoteViewModel {
     func release(_ command: Command) {
         client.send(KeyEvent(command: command, isDown: false))
     }
+
+    func moveCursor(by translation: CGPoint, velocity: CGPoint) {
+        guard isConnected else { return }
+        let gain = Self.gain(forSpeed: hypot(velocity.x, velocity.y))
+        client.move(dx: translation.x * gain, dy: translation.y * gain)
+    }
+
+    func click(_ button: MouseButton, count: UInt8) {
+        guard isConnected else { return }
+        haptics.impactOccurred()
+        client.click(button, count: count)
+    }
+
+    /// Pointer ballistics: near 1:1 when the finger is slow so you can aim, several
+    /// times that on a flick so one swipe crosses the whole display.
+    private static func gain(forSpeed speed: Double) -> Double {
+        min(1 + speed / 1000 * 3.5, 4.5)
+    }
 }

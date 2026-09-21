@@ -32,6 +32,10 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     private var keyEvent: CBCharacteristic?
     private var approval: ApprovalState = .pending
     private var isRunning = false
+    /// Cursor movement waiting for the radio, kept fractional so slow, careful
+    /// movements are not lost to rounding.
+    private var pendingX = 0.0
+    private var pendingY = 0.0
 
     private static let lastPeripheralKey = "lastPeripheral"
 
@@ -63,6 +67,8 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
             self.peripheral = nil
             self.keyEvent = nil
             self.approval = .pending
+            self.pendingX = 0
+            self.pendingY = 0
             self.manager = nil
             self.report(.stopped)
         }
@@ -70,17 +76,13 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     public func send(_ event: KeyEvent) {
         queue.async {
-            guard self.approval == .approved,
-                  let peripheral = self.peripheral,
-                  let keyEvent = self.keyEvent,
-                  peripheral.state == .connected
-            else { return }
+            guard let target = self.target else { return }
 
             // Without-response skips the ACK round trip. Fall back when the queue is
             // full so a press is never silently dropped.
             let type: CBCharacteristicWriteType =
-                peripheral.canSendWriteWithoutResponse ? .withoutResponse : .withResponse
-            peripheral.writeValue(event.encoded, for: keyEvent, type: type)
+                target.peripheral.canSendWriteWithoutResponse ? .withoutResponse : .withResponse
+            target.peripheral.writeValue(event.encoded, for: target.characteristic, type: type)
         }
     }
 
@@ -88,6 +90,57 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     public func tap(_ command: Command) {
         send(KeyEvent(command: command, isDown: true))
         send(KeyEvent(command: command, isDown: false))
+    }
+
+    // MARK: - Pointer
+
+    /// Moves the cursor. Deltas pile up until the radio is ready rather than queueing
+    /// writes, so the cursor lands where the finger is now instead of replaying a
+    /// backlog a second behind it.
+    public func move(dx: Double, dy: Double) {
+        queue.async {
+            self.pendingX += dx
+            self.pendingY += dy
+            self.flushMove()
+        }
+    }
+
+    public func click(_ button: MouseButton, count: UInt8) {
+        queue.async {
+            self.flushMove() // a click must not overtake the movement that aimed it
+            guard let target = self.target else { return }
+
+            let type: CBCharacteristicWriteType =
+                target.peripheral.canSendWriteWithoutResponse ? .withoutResponse : .withResponse
+            target.peripheral.writeValue(
+                PointerEvent.click(button: button, count: count).encoded,
+                for: target.characteristic,
+                type: type
+            )
+        }
+    }
+
+    private func flushMove() {
+        guard let target, target.peripheral.canSendWriteWithoutResponse else { return }
+
+        let dx = pendingX.rounded(.towardZero)
+        let dy = pendingY.rounded(.towardZero)
+        guard dx != 0 || dy != 0 else { return }
+        pendingX -= dx
+        pendingY -= dy
+
+        let event = PointerEvent.move(dx: Int16(clamping: Int(dx)), dy: Int16(clamping: Int(dy)))
+        target.peripheral.writeValue(event.encoded, for: target.characteristic, type: .withoutResponse)
+    }
+
+    /// Everything needed to write, or nil when the link is not usable yet.
+    private var target: (peripheral: CBPeripheral, characteristic: CBCharacteristic)? {
+        guard approval == .approved,
+              let peripheral,
+              let keyEvent,
+              peripheral.state == .connected
+        else { return nil }
+        return (peripheral, keyEvent)
     }
 
     // MARK: - Discovery
@@ -185,6 +238,8 @@ extension RemoteClient: CBCentralManagerDelegate {
     ) {
         keyEvent = nil
         approval = .pending
+        pendingX = 0
+        pendingY = 0
         guard isRunning else { return }
         connect(to: peripheral)
     }
@@ -249,5 +304,10 @@ extension RemoteClient: CBPeripheralDelegate {
         if let error {
             print("[remote] subscribe failed on \(characteristic.uuid): \(error.localizedDescription)")
         }
+    }
+
+    /// Already on `queue`, like every other delegate callback here.
+    public func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        flushMove()
     }
 }

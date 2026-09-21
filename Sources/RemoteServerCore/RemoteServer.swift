@@ -23,6 +23,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     private let queue = DispatchQueue(label: "remote.server")
     private let serviceName: String
     private let injector = KeyInjector()
+    private let pointer = PointerInjector()
     private let store: PairedDeviceStore
 
     private var manager: CBPeripheralManager?
@@ -230,9 +231,15 @@ extension RemoteServer: CBPeripheralManagerDelegate {
                     reportDevices()
                     continue
                 }
-                if let value = request.value, let event = KeyEvent(wire: value) {
-                    injector.post(event)
-                    DispatchQueue.main.async { self.onEvent?(event) }
+                if let value = request.value {
+                    // Key events are the only two-byte payload, so length alone splits them
+                    // from tagged trackpad traffic and old builds keep working untouched.
+                    if value.count == KeyEvent.wireSize, let event = KeyEvent(wire: value) {
+                        injector.post(event)
+                        DispatchQueue.main.async { self.onEvent?(event) }
+                    } else if let event = PointerEvent(wire: value) {
+                        pointer.post(event)
+                    }
                 }
             } else {
                 result = .requestNotSupported

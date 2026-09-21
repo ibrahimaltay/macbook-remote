@@ -7,7 +7,7 @@ struct RemoteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            DPadView(model: model)
+            RootView(model: model)
                 .task { model.start() }
         }
         .onChange(of: scenePhase) { _, phase in

@@ -2,57 +2,38 @@ import RemoteProtocol
 import SwiftUI
 
 struct DPadView: View {
+    static let buttonSize: CGFloat = 100
+    static let spacing: CGFloat = 14
+    /// Three buttons and the two gaps between them. The trackpad matches this.
+    static let boxSize = buttonSize * 3 + spacing * 2
+
     let model: RemoteViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            StatusLabel(model: model)
-
-            Spacer()
-
-            Grid(horizontalSpacing: 14, verticalSpacing: 14) {
-                GridRow {
-                    spacer
-                    DPadButton(command: .up, symbol: "chevron.up", model: model)
-                    spacer
-                }
-                GridRow {
-                    DPadButton(command: .left, symbol: "chevron.left", model: model)
-                    DPadButton(command: .mid, symbol: "playpause.fill", model: model)
-                    DPadButton(command: .right, symbol: "chevron.right", model: model)
-                }
-                GridRow {
-                    spacer
-                    DPadButton(command: .down, symbol: "chevron.down", model: model)
-                    spacer
-                }
+        Grid(horizontalSpacing: Self.spacing, verticalSpacing: Self.spacing) {
+            GridRow {
+                spacer
+                DPadButton(command: .up, symbol: "chevron.up", model: model)
+                spacer
             }
-            .opacity(model.isConnected ? 1 : 0.35)
-            .animation(.easeOut(duration: 0.2), value: model.isConnected)
-            .padding(.bottom, 32)
+            GridRow {
+                DPadButton(command: .left, symbol: "chevron.left", model: model)
+                DPadButton(command: .mid, symbol: "playpause.fill", model: model)
+                DPadButton(command: .right, symbol: "chevron.right", model: model)
+            }
+            GridRow {
+                spacer
+                DPadButton(command: .down, symbol: "chevron.down", model: model)
+                spacer
+            }
         }
-        .padding()
+        .opacity(model.isConnected ? 1 : 0.35)
+        .animation(.easeOut(duration: 0.2), value: model.isConnected)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 
     private var spacer: some View {
         Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-    }
-}
-
-private struct StatusLabel: View {
-    let model: RemoteViewModel
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(model.isConnected ? .green : .orange)
-                .frame(width: 8, height: 8)
-            Text(model.statusText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
@@ -65,8 +46,8 @@ private struct DPadButton: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(isPressed ? Color.accentColor : Color(.secondarySystemBackground))
-            .frame(width: 100, height: 100)
+            .fill(isPressed ? Color.accentColor : Color(.systemGray5))
+            .frame(width: DPadView.buttonSize, height: DPadView.buttonSize)
             .overlay {
                 Image(systemName: symbol)
                     .font(.system(size: 30, weight: .semibold))
