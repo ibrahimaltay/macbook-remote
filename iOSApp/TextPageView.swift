@@ -1,8 +1,11 @@
 import SwiftUI
 
-struct TextPageView: View {
+struct TextPageView<PageSwipe: Gesture>: View {
     let model: RemoteViewModel
     let isActive: Bool
+    /// The same gesture the edge strips use, so the threshold and animation stay
+    /// defined in one place.
+    let pageSwipe: PageSwipe
 
     @State private var draft = ""
     @State private var repeatTask: Task<Void, Never>?
@@ -10,7 +13,11 @@ struct TextPageView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Spacer(minLength: 0)
+            // This page has room to spare above the input, so paging works from all
+            // of it rather than only the edges.
+            Color.clear
+                .contentShape(.rect)
+                .gesture(pageSwipe)
 
             confirmation
 
@@ -40,6 +47,7 @@ struct TextPageView: View {
         .animation(.easeOut(duration: 0.2), value: canSend)
         .animation(.easeOut(duration: 0.2), value: model.textStatus)
         .padding(.horizontal, 20)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .onChange(of: isActive) { _, active in
             isFocused = active

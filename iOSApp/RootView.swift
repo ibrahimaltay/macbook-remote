@@ -21,7 +21,7 @@ struct RootView: View {
                         .frame(width: proxy.size.width)
                     TrackpadView(model: model)
                         .frame(width: proxy.size.width)
-                    TextPageView(model: model, isActive: page == 2)
+                    TextPageView(model: model, isActive: page == 2, pageSwipe: swipe)
                         .frame(width: proxy.size.width)
                 }
                 .offset(x: offset(for: proxy.size.width))
