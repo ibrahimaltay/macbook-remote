@@ -19,10 +19,13 @@ struct TrackpadView: View {
                     .padding(.bottom, 16)
                     .allowsHitTesting(false)
             }
-            .frame(width: DPadView.boxSize, height: DPadView.boxSize)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .opacity(model.isConnected ? 1 : 0.35)
             .animation(.easeOut(duration: 0.2), value: model.isConnected)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Stops exactly where the paging edge strips begin, so neither steals
+            // the other's touches.
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
     }
 }
 

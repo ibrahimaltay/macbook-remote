@@ -39,7 +39,7 @@ struct TextPageView: View {
         }
         .animation(.easeOut(duration: 0.2), value: canSend)
         .animation(.easeOut(duration: 0.2), value: model.textStatus)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .onChange(of: isActive) { _, active in
             isFocused = active

@@ -4,8 +4,6 @@ import SwiftUI
 struct DPadView: View {
     static let buttonSize: CGFloat = 100
     static let spacing: CGFloat = 14
-    /// Three buttons and the two gaps between them. The trackpad matches this.
-    static let boxSize = buttonSize * 3 + spacing * 2
 
     let model: RemoteViewModel
 
@@ -29,7 +27,8 @@ struct DPadView: View {
         }
         .opacity(model.isConnected ? 1 : 0.35)
         .animation(.easeOut(duration: 0.2), value: model.isConnected)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 64)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
     private var spacer: some View {

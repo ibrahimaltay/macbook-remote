@@ -7,6 +7,9 @@ struct RootView: View {
     @State private var drag: CGFloat = 0
 
     private let pageCount = 3
+    /// Narrow enough to sit in the margin beside every page's controls, so a strip
+    /// never steals a touch meant for the trackpad or the text field.
+    private let edgeWidth: CGFloat = 20
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,32 +26,33 @@ struct RootView: View {
                 }
                 .offset(x: offset(for: proxy.size.width))
             }
-            .frame(height: DPadView.boxSize)
-            .padding(.top, 24)
-            .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .overlay(alignment: .leading) { edge }
+        .overlay(alignment: .trailing) { edge }
         // The pages reach the bottom edge, where a sideways drag would otherwise
         // flick iOS into another app mid-gesture.
         .defersSystemGestures(on: .bottom)
     }
 
-    /// Paging lives up here and nowhere else: the trackpad needs every horizontal
-    /// drag inside it, the d-pad buttons swallow drags of their own, and a strip
-    /// along the bottom would compete with the home indicator. The tint marks
-    /// exactly the area that responds.
+    /// Paging happens here and nowhere else: the trackpad needs every horizontal
+    /// drag inside it, and the d-pad buttons swallow drags of their own.
+    private var edge: some View {
+        Color.clear
+            .frame(width: edgeWidth)
+            .contentShape(.rect)
+            .gesture(swipe)
+    }
+
     private var header: some View {
         VStack(spacing: 14) {
             StatusLabel(model: model)
             PageDots(count: pageCount, current: page)
         }
         .padding(.top, 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(.secondarySystemBackground))
-        .clipped()
-        .contentShape(.rect)
-        .gesture(swipe)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity)
     }
 
     private var swipe: some Gesture {
