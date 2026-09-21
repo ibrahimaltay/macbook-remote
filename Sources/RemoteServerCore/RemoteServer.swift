@@ -29,6 +29,8 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     private var manager: CBPeripheralManager?
     private var control: CBMutableCharacteristic?
     private var connected: [UUID: CBCentral] = [:]
+    /// Text arriving in pieces, per device, until the final chunk lands.
+    private var incomingText: [UUID: Data] = [:]
     /// Names of devices that have shown up but are not approved yet.
     private var pending: [UUID: String] = [:]
     private var isRunning = false
@@ -56,6 +58,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
             self.manager = nil
             self.control = nil
             self.connected.removeAll()
+            self.incomingText.removeAll()
             self.pending.removeAll()
             self.report(.stopped)
             self.reportDevices()
@@ -138,6 +141,27 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
         DispatchQueue.main.async { self.onStatus?(status) }
     }
 
+    private func accept(_ chunk: TextChunk, from id: UUID) {
+        var text = incomingText[id] ?? Data()
+        text += chunk.bytes
+
+        // Give up on a message that never ends rather than growing without limit.
+        guard text.count <= TextChunk.maxBytes else {
+            incomingText.removeValue(forKey: id)
+            return
+        }
+
+        guard chunk.isFinal else {
+            incomingText[id] = text
+            return
+        }
+
+        incomingText.removeValue(forKey: id)
+        if let typed = String(data: text, encoding: .utf8) {
+            injector.type(typed)
+        }
+    }
+
     private func reportDevices() {
         var devices = store.approved.map { id, name in
             PairedDevice(id: id, name: name, isApproved: true, isConnected: connected[id] != nil)
@@ -200,6 +224,7 @@ extension RemoteServer: CBPeripheralManagerDelegate {
     ) {
         guard characteristic.uuid == RemoteService.controlUUID else { return }
         connected.removeValue(forKey: central.identifier)
+        incomingText.removeValue(forKey: central.identifier)
         reportDevices()
     }
 
@@ -239,6 +264,8 @@ extension RemoteServer: CBPeripheralManagerDelegate {
                         DispatchQueue.main.async { self.onEvent?(event) }
                     } else if let event = PointerEvent(wire: value) {
                         pointer.post(event)
+                    } else if let chunk = TextChunk(wire: value) {
+                        accept(chunk, from: request.central.identifier)
                     }
                 }
             } else {

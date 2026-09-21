@@ -22,6 +22,9 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     /// Called on the main queue.
     public var onStatus: ((Status) -> Void)?
+    /// Called on the main queue once every chunk of a typed message has been
+    /// acknowledged, or as soon as one fails.
+    public var onTextDelivered: ((Bool) -> Void)?
 
     private let queue = DispatchQueue(label: "remote.client")
     private let deviceName: String
@@ -36,6 +39,9 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     /// movements are not lost to rounding.
     private var pendingX = 0.0
     private var pendingY = 0.0
+    /// Chunks of the message being typed that have not been acknowledged yet.
+    private var pendingTextWrites = 0
+    private var textWriteFailed = false
 
     private static let lastPeripheralKey = "lastPeripheral"
 
@@ -122,7 +128,6 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     private func flushMove() {
         guard let target, target.peripheral.canSendWriteWithoutResponse else { return }
-
         let dx = pendingX.rounded(.towardZero)
         let dy = pendingY.rounded(.towardZero)
         guard dx != 0 || dy != 0 else { return }
@@ -141,6 +146,39 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
               peripheral.state == .connected
         else { return nil }
         return (peripheral, keyEvent)
+    }
+
+    // MARK: - Text
+
+    /// Types text on the Mac. Split across writes to fit the MTU, and acknowledged
+    /// rather than fire-and-forget, because a lost chunk would corrupt the message.
+    public func send(text: String) {
+        queue.async {
+            let bytes = Data(text.utf8)
+            guard !bytes.isEmpty, let target = self.target else {
+                self.reportText(delivered: false)
+                return
+            }
+
+            let room = target.peripheral.maximumWriteValueLength(for: .withResponse)
+            let limit = max(room - TextChunk.headerSize, 1)
+
+            self.pendingTextWrites = 0
+            self.textWriteFailed = false
+
+            var index = bytes.startIndex
+            while index < bytes.endIndex {
+                let end = bytes.index(index, offsetBy: limit, limitedBy: bytes.endIndex) ?? bytes.endIndex
+                let chunk = TextChunk(isFinal: end == bytes.endIndex, bytes: Data(bytes[index..<end]))
+                self.pendingTextWrites += 1
+                target.peripheral.writeValue(chunk.encoded, for: target.characteristic, type: .withResponse)
+                index = end
+            }
+        }
+    }
+
+    private func reportText(delivered: Bool) {
+        DispatchQueue.main.async { self.onTextDelivered?(delivered) }
     }
 
     // MARK: - Discovery
@@ -293,6 +331,17 @@ extension RemoteClient: CBPeripheralDelegate {
     ) {
         if let error {
             print("[remote] write failed on \(characteristic.uuid): \(error.localizedDescription)")
+        }
+        guard characteristic.uuid == RemoteService.keyEventUUID, pendingTextWrites > 0 else { return }
+
+        // Acknowledgements arrive in write order, so counting them down is enough to
+        // know the last chunk landed. A key press that happened to fall back to a
+        // write-with-response could nudge the count early, which only ever makes the
+        // confirmation appear a chunk sooner.
+        pendingTextWrites -= 1
+        textWriteFailed = textWriteFailed || error != nil
+        if pendingTextWrites == 0 {
+            reportText(delivered: !textWriteFailed)
         }
     }
 

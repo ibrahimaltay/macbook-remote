@@ -1,12 +1,13 @@
 import Foundation
 
-/// One of the five buttons on the remote.
+/// One of the buttons on the remote.
 public enum Command: UInt8, CaseIterable, Sendable {
     case up = 0
     case down = 1
     case left = 2
     case right = 3
     case mid = 4
+    case backspace = 5
 }
 
 /// A press or a release of one button.
@@ -44,6 +45,7 @@ extension Command {
         case .left: "LEFT"
         case .right: "RIGHT"
         case .mid: "MID"
+        case .backspace: "BACKSPACE"
         }
     }
 

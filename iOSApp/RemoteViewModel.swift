@@ -6,10 +6,18 @@ import UIKit
 @MainActor
 @Observable
 final class RemoteViewModel {
+    enum TextStatus: Equatable {
+        case sending
+        case sent
+        case failed
+    }
+
     private(set) var status: RemoteClient.Status = .stopped
+    private(set) var textStatus: TextStatus?
 
     private let client = RemoteClient()
     private let haptics = UIImpactFeedbackGenerator(style: .rigid)
+    private var textStatusReset: Task<Void, Never>?
 
     var isConnected: Bool {
         if case .connected = status { return true }
@@ -38,6 +46,12 @@ final class RemoteViewModel {
                 UIApplication.shared.isIdleTimerDisabled = self.isConnected
             }
         }
+        client.onTextDelivered = { [weak self] delivered in
+            // RemoteClient always reports on the main queue.
+            MainActor.assumeIsolated {
+                self?.show(delivered ? .sent : .failed)
+            }
+        }
         haptics.prepare()
     }
 
@@ -59,6 +73,14 @@ final class RemoteViewModel {
         client.send(KeyEvent(command: command, isDown: false))
     }
 
+    /// `feedback` is off while a key auto-repeats, where a buzz per press would be
+    /// a continuous rumble.
+    func tap(_ command: Command, feedback: Bool = true) {
+        guard isConnected else { return }
+        if feedback { haptics.impactOccurred() }
+        client.tap(command)
+    }
+
     func moveCursor(by translation: CGPoint, velocity: CGPoint) {
         guard isConnected else { return }
         let gain = Self.gain(forSpeed: hypot(velocity.x, velocity.y))
@@ -75,5 +97,25 @@ final class RemoteViewModel {
     /// times that on a flick so one swipe crosses the whole display.
     private static func gain(forSpeed speed: Double) -> Double {
         min(1 + speed / 1000 * 3.5, 4.5)
+    }
+
+    func send(text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isConnected, !trimmed.isEmpty else { return }
+        haptics.impactOccurred()
+        show(.sending)
+        client.send(text: trimmed)
+    }
+
+    private func show(_ status: TextStatus) {
+        textStatus = status
+        textStatusReset?.cancel()
+        guard status != .sending else { return }
+
+        textStatusReset = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            textStatus = nil
+        }
     }
 }

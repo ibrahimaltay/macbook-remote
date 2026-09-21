@@ -6,7 +6,7 @@ struct RootView: View {
     @State private var page = 0
     @State private var drag: CGFloat = 0
 
-    private let pageCount = 2
+    private let pageCount = 3
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +17,8 @@ struct RootView: View {
                     DPadView(model: model)
                         .frame(width: proxy.size.width)
                     TrackpadView(model: model)
+                        .frame(width: proxy.size.width)
+                    TextPageView(model: model, isActive: page == 2)
                         .frame(width: proxy.size.width)
                 }
                 .offset(x: offset(for: proxy.size.width))
@@ -44,6 +46,7 @@ struct RootView: View {
         .padding(.top, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(.secondarySystemBackground))
+        .clipped()
         .contentShape(.rect)
         .gesture(swipe)
     }
