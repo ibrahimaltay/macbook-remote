@@ -14,6 +14,9 @@ public enum RemoteService {
     /// Read/notify carries the approval state; write carries the phone's name.
     public static var controlUUID: CBUUID { CBUUID(string: "511438D4-A85C-4C8A-B82F-D22566DE4C54") }
 
+    public static var secureControlUUID: CBUUID { CBUUID(string: "64B1C682-BC10-48CF-93F5-8242F02396DD") }
+    public static var secureInputUUID: CBUUID { CBUUID(string: "3F728627-E19A-4DF6-84CB-81E06DA0C7E9") }
+
     public static let defaultName = "LazyRemote"
 }
 

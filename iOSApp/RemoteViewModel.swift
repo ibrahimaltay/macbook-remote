@@ -32,6 +32,8 @@ final class RemoteViewModel {
         case .unsupported: "Bluetooth not supported"
         case .scanning: "Looking for your Mac…"
         case .connecting(let name): "Connecting to \(name)…"
+        case .securing(let name): "Securing connection to \(name)…"
+        case .failed(let message): message
         case .awaitingApproval(let name): "Allow this iPhone on \(name)"
         case .connected(let name): name
         }
@@ -62,6 +64,15 @@ final class RemoteViewModel {
     func stop() {
         client.stop()
         UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    func reconnect() {
+        client.stop()
+        client.start()
+    }
+
+    func forgetMac() {
+        client.forgetMac()
     }
 
     func press(_ command: Command) {
@@ -100,6 +111,7 @@ final class RemoteViewModel {
     }
 
     func send(text: String) {
+        guard textStatus != .sending else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isConnected, !trimmed.isEmpty else { return }
         haptics.impactOccurred()

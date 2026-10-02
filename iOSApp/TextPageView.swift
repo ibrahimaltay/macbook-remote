@@ -96,7 +96,9 @@ struct TextPageView<PageSwipe: Gesture>: View {
     }
 
     private var canSend: Bool {
-        model.isConnected && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        model.isConnected && model.textStatus != .sending
+            && draft.utf8.count <= 4096
+            && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     @ViewBuilder
@@ -105,7 +107,7 @@ struct TextPageView<PageSwipe: Gesture>: View {
         case .sent:
             label("Sent", symbol: "checkmark", tint: .secondary)
         case .failed:
-            label("Not sent", symbol: "exclamationmark.triangle", tint: .red)
+            label("Not confirmed", symbol: "exclamationmark.triangle", tint: .red)
         case .sending, nil:
             EmptyView()
         }

@@ -5,6 +5,7 @@ struct RootView: View {
 
     @State private var page = 0
     @State private var drag: CGFloat = 0
+    @State private var confirmsForget = false
 
     private let pageCount = 3
     /// Narrow enough to sit in the margin beside every page's controls, so a strip
@@ -47,12 +48,33 @@ struct RootView: View {
 
     private var header: some View {
         VStack(spacing: 14) {
-            StatusLabel(model: model)
+            HStack(spacing: 12) {
+                StatusLabel(model: model)
+                    .frame(maxWidth: .infinity)
+                Menu {
+                    Button("Reconnect", systemImage: "arrow.clockwise") {
+                        model.reconnect()
+                    }
+                    Button("Forget Mac", systemImage: "trash", role: .destructive) {
+                        confirmsForget = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Connection options")
+            }
+            .padding(.horizontal, 16)
             PageDots(count: pageCount, current: page)
         }
         .padding(.top, 14)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity)
+        .confirmationDialog("Forget this Mac?", isPresented: $confirmsForget, titleVisibility: .visible) {
+            Button("Forget Mac", role: .destructive) { model.forgetMac() }
+        } message: {
+            Text("The saved Mac identity will be removed. Only reconnect to a Mac you trust.")
+        }
     }
 
     private var swipe: some Gesture {

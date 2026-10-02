@@ -140,6 +140,11 @@ case "send":
             print("scanning…")
         case .connecting(let name):
             print("connecting to \(name)…")
+        case .securing(let name):
+            print("securing connection to \(name)…")
+        case .failed(let message):
+            print(message)
+            exit(1)
         case .awaitingApproval(let name):
             print("waiting for \(name) to allow this device…")
         case .connected(let name):
