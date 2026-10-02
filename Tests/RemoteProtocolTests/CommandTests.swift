@@ -15,6 +15,7 @@ final class CommandTests: XCTestCase {
 
     func testEncodesToTwoBytes() {
         XCTAssertEqual(KeyEvent(command: .mid, isDown: true).encoded, Data([4, 1]))
+        XCTAssertEqual(KeyEvent(command: .enter, isDown: true).encoded, Data([6, 1]))
     }
 
     func testDecodesFromASliceThatDoesNotStartAtZero() {
@@ -30,6 +31,7 @@ final class CommandTests: XCTestCase {
 
     func testParsesCommandNames() {
         XCTAssertEqual(Command(name: "right"), .right)
+        XCTAssertEqual(Command(name: "enter"), .enter)
         XCTAssertNil(Command(name: "VOLUME_UP"))
     }
 }

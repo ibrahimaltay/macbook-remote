@@ -8,6 +8,7 @@ public enum Command: UInt8, CaseIterable, Sendable {
     case right = 3
     case mid = 4
     case backspace = 5
+    case enter = 6
 }
 
 /// A press or a release of one button.
@@ -46,6 +47,7 @@ extension Command {
         case .right: "RIGHT"
         case .mid: "MID"
         case .backspace: "BACKSPACE"
+        case .enter: "ENTER"
         }
     }
 

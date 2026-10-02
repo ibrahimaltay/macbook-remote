@@ -11,13 +11,14 @@ extension Command {
         case .right: 124
         case .mid: 49
         case .backspace: 51
+        case .enter: 36
         }
     }
 
     var isArrow: Bool {
         switch self {
         case .up, .down, .left, .right: true
-        case .mid, .backspace: false
+        case .mid, .backspace, .enter: false
         }
     }
 }

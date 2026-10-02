@@ -191,8 +191,8 @@ strings occupy the remaining bytes as nonempty valid UTF-8, without a length fie
 | 8 textResult | textID8 + success1 (0 or 1) | 10 | serverControl |
 | 9 finish | None | 1 | Control confirmation only |
 
-Commands are up=0, down=1, left=2, right=3, mid/Space=4, backspace=5. Mac keycodes
-are respectively 126, 125, 123, 124, 49, 51. Pointer buttons are left=0, right=1;
+Commands are up=0, down=1, left=2, right=3, mid/Space=4, backspace=5, enter=6. Mac
+keycodes are respectively 126, 125, 123, 124, 49, 51, 36. Pointer buttons are left=0, right=1;
 count is a raw UInt8 (the codec adds no narrower range restriction). Pointer
 deltas are signed little-endian, unlike record/frame/text IDs. Unknown tags,
 invalid lengths, invalid UTF-8, and invalid command/button/boolean values fail.

@@ -34,6 +34,8 @@ struct TextPageView<PageSwipe: Gesture>: View {
 
                 backspaceButton
 
+                enterButton
+
                 Button(action: { model.send(text: draft) }) {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 18, weight: .bold))
@@ -73,6 +75,17 @@ struct TextPageView<PageSwipe: Gesture>: View {
                     .onEnded { _ in stopDeleting() }
             )
             .disabled(!model.isConnected)
+    }
+
+    private var enterButton: some View {
+        Button(action: { model.tap(.enter) }) {
+            Image(systemName: "return")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.primary)
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(Color(.systemGray5)))
+        }
+        .disabled(!model.isConnected)
     }
 
     private var isDeleting: Bool { repeatTask != nil }
