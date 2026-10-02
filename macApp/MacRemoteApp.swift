@@ -8,7 +8,7 @@ struct MacRemoteApp: App {
         MenuBarExtra {
             StatusMenu(model: model)
         } label: {
-            Image(systemName: model.iconName)
+            model.icon
                 .opacity(model.isEnabled ? 1 : 0.4)
         }
         .menuBarExtraStyle(.menu)

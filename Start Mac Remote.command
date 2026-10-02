@@ -2,8 +2,8 @@
 # Double-click in Finder to start the remote. Quit it from the menu bar icon.
 cd "$(dirname "$0")" || exit 1
 
-APP="/Applications/MacRemote.app"
-[ -d "$APP" ] || APP=".build/dd/Build/Products/Debug/MacRemote.app"
+APP="/Applications/LazyRemote.app"
+[ -d "$APP" ] || APP=".build/dd/Build/Products/Debug/LazyRemote.app"
 
 if [ ! -d "$APP" ]; then
   echo "Building…"
@@ -15,4 +15,4 @@ if [ ! -d "$APP" ]; then
 fi
 
 open "$APP" || { echo "could not start $APP"; read -r; exit 1; }
-echo "Mac Remote is running — look for the d-pad icon in the menu bar."
+echo "LazyRemote is running — look for the d-pad icon in the menu bar."

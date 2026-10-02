@@ -14,7 +14,7 @@ public enum RemoteService {
     /// Read/notify carries the approval state; write carries the phone's name.
     public static var controlUUID: CBUUID { CBUUID(string: "511438D4-A85C-4C8A-B82F-D22566DE4C54") }
 
-    public static let defaultName = "Mac Remote"
+    public static let defaultName = "LazyRemote"
 }
 
 /// Whether the Mac has accepted a device.

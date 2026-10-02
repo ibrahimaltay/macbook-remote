@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import RemoteProtocol
 import RemoteServerCore
+import SwiftUI
 
 @MainActor
 @Observable
@@ -64,10 +65,10 @@ final class ServerViewModel {
         }
     }
 
-    var iconName: String {
-        if !isAccessibilityTrusted { return "exclamationmark.triangle.fill" }
-        if case .failed = status { return "exclamationmark.triangle.fill" }
-        return connectedCount > 0 ? "dpad.fill" : "dpad"
+    var icon: Image {
+        if !isAccessibilityTrusted { return Image(systemName: "exclamationmark.triangle.fill") }
+        if case .failed = status { return Image(systemName: "exclamationmark.triangle.fill") }
+        return Image(connectedCount > 0 ? "RemoteIconFill" : "RemoteIcon")
     }
 
     init() {

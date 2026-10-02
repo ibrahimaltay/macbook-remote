@@ -160,4 +160,10 @@ bar app asks instead.
 ## Notes
 - The Mac sleeping tears down the peripheral. The menu bar app rebuilds it on
   `NSWorkspace.didWakeNotification`.
-- On a free developer account the iPhone build expires every 7 days.
+
+
+## Distribution Strategy
+
+the Mac APP is shared via github repo, anyone can download, for free.
+
+the iPhone app will be uploaded to app store, as a free app.

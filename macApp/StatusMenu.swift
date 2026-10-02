@@ -53,10 +53,10 @@ struct StatusMenu: View {
 
         Divider()
 
-        Button("About Mac Remote") {
+        Button("About LazyRemote") {
             model.showAbout()
         }
-        Button("Quit Mac Remote") {
+        Button("Quit LazyRemote") {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
