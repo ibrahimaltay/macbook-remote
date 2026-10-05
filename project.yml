@@ -23,6 +23,8 @@ targets:
       path: iOSApp/Info.plist
       properties:
         CFBundleDisplayName: LazyRemote
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "2"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
