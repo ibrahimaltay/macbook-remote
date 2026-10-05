@@ -53,12 +53,14 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         var index = 0
     }
 
-    private let queue = DispatchQueue(label: "remote.client")
+    let queue = DispatchQueue(label: "remote.client")
     private let deviceName: String
     private let defaults: UserDefaults
     private let trust: PeerTrustStore
-    private var manager: CBCentralManager?
-    private var peripheral: CBPeripheral?
+    private let makeCentral: (any BluetoothCentralDelegate, DispatchQueue) -> any BluetoothCentral
+    private let schedule: ((TimeInterval, @escaping @Sendable () -> Void) -> Void)?
+    private var manager: (any BluetoothCentral)?
+    private var peripheral: (any BluetoothPeripheral)?
     private var secureInput: CBCharacteristic?
     private var secureControl: CBCharacteristic?
     private var stage: Stage = .idle
@@ -103,16 +105,32 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     #if canImport(UIKit)
     @MainActor
     #endif
-    public init(
+    public convenience init(
         deviceName: String = RemoteClient.localDeviceName,
         defaults: UserDefaults = .standard,
         keyStore: (any SecureKeyStore)?
+    ) {
+        self.init(
+            deviceName: deviceName, defaults: defaults, keyStore: keyStore,
+            makeCentral: { CoreBluetoothCentral(delegate: $0, queue: $1) }, schedule: nil
+        )
+    }
+
+    /// `schedule` runs work on the client's queue after a delay; `nil` uses real time.
+    init(
+        deviceName: String,
+        defaults: UserDefaults,
+        keyStore: (any SecureKeyStore)?,
+        makeCentral: @escaping (any BluetoothCentralDelegate, DispatchQueue) -> any BluetoothCentral,
+        schedule: ((TimeInterval, @escaping @Sendable () -> Void) -> Void)?
     ) {
         self.deviceName = deviceName
         self.defaults = defaults
         trust = PeerTrustStore(store: keyStore ?? KeychainSecureKeyStore(
             service: "com.altay.lazyremote.client.security"
         ))
+        self.makeCentral = makeCentral
+        self.schedule = schedule
         super.init()
     }
 
@@ -128,7 +146,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         guard manager == nil else { return }
         isRunning = true
         stage = .idle
-        manager = CBCentralManager(delegate: self, queue: queue)
+        manager = makeCentral(self, queue)
     }
 
     public func stop() {
@@ -205,7 +223,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
                 let token = UUID()
                 self.textTimer = token
                 let generation = self.generation
-                self.queue.asyncAfter(deadline: .now() + 30) {
+                self.after(30) {
                     guard self.generation == generation, self.textTimer == token,
                           self.pendingTextID == id else { return }
                     self.fail("Text delivery timed out. Reconnect to the Mac before trying again.")
@@ -260,7 +278,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         queuedFrames += frames
         queuedBytes += bytes
                 let generation = self.generation
-                queue.asyncAfter(deadline: .now() + 30) {
+                after(30) {
             guard self.generation == generation,
                 self.jobs.contains(where: { $0.token == token }) else { return }
             self.fail("Secure write queue timed out. Reconnect to the Mac.")
@@ -306,7 +324,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
                 jobs.removeFirst()
                 record = WriteRecord(id: id, frames: frames, characteristic: characteristic, type: job.type)
                 let generation = self.generation
-                queue.asyncAfter(deadline: .now() + 30) {
+                after(30) {
                     guard self.generation == generation, self.record?.id == id else { return }
                     self.fail("Secure transfer timed out. Reconnect to the Mac.")
                 }
@@ -366,7 +384,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         let token = UUID()
         stageTimer = token
         let generation = self.generation
-        queue.asyncAfter(deadline: .now() + seconds) {
+        after(seconds) {
             guard self.generation == generation, self.stageTimer == token,
                   self.stage != .ready, self.stage != .idle, self.stage != .failed else { return }
             self.fail("Secure connection timed out. Reconnect and check approval on the Mac.")
@@ -402,7 +420,15 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         manager.scanForPeripherals(withServices: [RemoteService.uuid])
     }
 
-    private func connect(to peripheral: CBPeripheral) {
+    private func after(_ seconds: TimeInterval, _ work: @escaping @Sendable () -> Void) {
+        if let schedule {
+            schedule(seconds, work)
+        } else {
+            queue.asyncAfter(deadline: .now() + seconds, execute: work)
+        }
+    }
+
+    private func connect(to peripheral: any BluetoothPeripheral) {
         resetConnection()
         self.peripheral = peripheral
         peripheral.delegate = self
@@ -422,7 +448,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         #endif
     }
 
-    private static func describe(_ peripheral: CBPeripheral) -> String {
+    private static func describe(_ peripheral: any BluetoothPeripheral) -> String {
         peripheral.name ?? RemoteService.defaultName
     }
 
@@ -431,8 +457,8 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     }
 }
 
-extension RemoteClient: CBCentralManagerDelegate {
-    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+extension RemoteClient: BluetoothCentralDelegate {
+    func centralDidUpdateState(_ central: any BluetoothCentral) {
         guard central === manager else { return }
         switch central.state {
         case .poweredOn: scan()
@@ -454,16 +480,13 @@ extension RemoteClient: CBCentralManagerDelegate {
         }
     }
 
-    public func centralManager(
-        _ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
-        advertisementData: [String: Any], rssi RSSI: NSNumber
-    ) {
+    func central(_ central: any BluetoothCentral, didDiscover peripheral: any BluetoothPeripheral) {
         guard central === manager, isRunning, stage == .idle else { return }
         central.stopScan()
         connect(to: peripheral)
     }
 
-    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+    func central(_ central: any BluetoothCentral, didConnect peripheral: any BluetoothPeripheral) {
         guard central === manager, peripheral === self.peripheral, stage == .connecting else { return }
         defaults.set(peripheral.identifier.uuidString, forKey: Self.lastPeripheralKey)
         stage = .services
@@ -471,18 +494,14 @@ extension RemoteClient: CBCentralManagerDelegate {
         peripheral.discoverServices([RemoteService.uuid])
     }
 
-    public func centralManager(
-        _ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?
-    ) {
+    func central(_ central: any BluetoothCentral, didFailToConnect peripheral: any BluetoothPeripheral) {
         guard central === manager, peripheral === self.peripheral, stage == .connecting else { return }
         self.peripheral = nil
         resetConnection()
         scan()
     }
 
-    public func centralManager(
-        _ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?
-    ) {
+    func central(_ central: any BluetoothCentral, didDisconnect peripheral: any BluetoothPeripheral) {
         guard central === manager, peripheral === self.peripheral else { return }
         guard stage != .failed else { return }
         resetConnection()
@@ -567,7 +586,7 @@ extension RemoteClient: CBPeripheralDelegate {
                 let token = receiveTimer
                 let generation = self.generation
                 let remaining = min(10, max(0, 30 - (now - (receiveStarted ?? now))))
-                queue.asyncAfter(deadline: .now() + remaining) {
+                after(remaining) {
                     guard self.generation == generation, self.receiveTimer == token else { return }
                     self.fail("Secure notification transfer timed out. Reconnect to the Mac.")
                 }
