@@ -65,7 +65,8 @@ is not sandboxed. The iPhone keeps its screen awake while connected.
 - `Sources/RemoteClientCore/`: central, client state, serialized writes and receipts.
 - `Sources/RemoteServerCore/`: peripheral, approval, input decoder and CGEvent injection.
 - `Sources/remotectl/`: CLI test harness; `--allow-new` is for testing only.
-- `iOSApp/` and `macApp/`: SwiftUI applications with an existing Xcode project.
+- `iOSApp/` and `macApp/`: SwiftUI applications with an existing Xcode project, split into
+  `Models/` (app-local only), `Views/` and `ViewModels/`; the `@main` entry stays at the root.
 - [project.yml](project.yml) and [MacRemote.xcodeproj/project.pbxproj](MacRemote.xcodeproj/project.pbxproj):
   XcodeGen configuration and generated project; Xcode/iOS SDK are available.
 - [scripts/make-app.sh](scripts/make-app.sh): signed-bundle CLI injection harness.

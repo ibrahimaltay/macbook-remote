@@ -23,6 +23,6 @@ let package = Package(
         .testTarget(name: "RemoteProtocolTests", dependencies: ["RemoteProtocol"]),
         .testTarget(name: "RemoteSecurityTests", dependencies: ["RemoteSecurity"]),
         .testTarget(name: "RemoteServerCoreTests", dependencies: ["RemoteServerCore", "RemoteSecurity"]),
-        .testTarget(name: "RemoteClientCoreTests", dependencies: ["RemoteClientCore"]),
+        .testTarget(name: "RemoteClientCoreTests", dependencies: ["RemoteClientCore", "RemoteSecurity"]),
     ]
 )
