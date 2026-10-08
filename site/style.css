@@ -1,0 +1,101 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1d1d1f;
+  --muted: #6e6e73;
+  --bg: #fff;
+  --line: #e5e5ea;
+  --accent: #0071e3;
+  --accent-fg: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #f5f5f7;
+    --muted: #a1a1a6;
+    --bg: #000;
+    --line: #2c2c2e;
+    --accent: #2997ff;
+    --accent-fg: #000;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+main, header, footer {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+header nav a { margin-left: 1rem; }
+
+.brand { font-weight: 600; color: var(--fg); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1 { font-size: 2.4rem; line-height: 1.15; margin: 2.5rem 0 0.75rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.4rem; margin: 2.5rem 0 0.5rem; }
+h3 { font-size: 1.1rem; margin: 1.5rem 0 0.25rem; }
+
+.lead { font-size: 1.2rem; color: var(--muted); margin: 0 0 1.5rem; }
+.muted { color: var(--muted); }
+
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; }
+
+.button {
+  display: inline-block;
+  padding: 0.75rem 1.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.button:hover { text-decoration: none; opacity: 0.9; }
+
+.shots {
+  display: flex;
+  gap: 1rem;
+  margin: 2.5rem 0 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.shots img {
+  flex: 0 0 auto;
+  width: min(13rem, 70vw);
+  height: auto;
+  border-radius: 1.5rem;
+  border: 1px solid var(--line);
+  scroll-snap-align: center;
+}
+
+ul, ol { padding-left: 1.25rem; }
+li { margin: 0.35rem 0; }
+
+footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer a { margin-right: 1rem; }

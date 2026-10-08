@@ -94,6 +94,13 @@ free iPhone app on the App Store. App Store distribution is a goal, not out of s
 or already completed. Developer ID signing, hardened runtime, and notarization for
 Mac distribution still need release validation.
 
+The website is static HTML/CSS in `site/`, deployed to GitHub Pages by
+`.github/workflows/pages.yml` (https://ibrahimaltay.github.io/macbook-remote/). It
+hosts the App Store Privacy and Support URLs. Its download button points to
+`releases/latest/download/LazyRemote.dmg`, so every release must attach the
+unversioned `LazyRemote.dmg` that `scripts/release-mac.sh` produces. Keep
+`site/privacy.html` in sync with `PRIVACY.md`.
+
 - Physical secure-v2 iPhone/Mac tests, including packet inspection for plaintext
   leakage, MTU fragmentation, sustained backpressure, failures, sleep/wake,
   reconnection, multiple peers, held-key cleanup, and receipt ambiguity.

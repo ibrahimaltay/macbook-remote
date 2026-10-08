@@ -6,7 +6,7 @@ Use your iPhone as a remote for your Mac, over Bluetooth.
 ![iOS 17+](https://img.shields.io/badge/iOS-17%2B-black)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 
-**[Download for Mac](https://github.com/ibrahimaltay/macbook-remote/releases/latest)** · iPhone app coming soon to the App Store
+**[Website](https://ibrahimaltay.github.io/macbook-remote/)** · **[Download for Mac](https://github.com/ibrahimaltay/macbook-remote/releases/latest)** · iPhone app coming soon to the App Store
 
 ## Screenshots
 

@@ -66,4 +66,7 @@ xcrun stapler staple "$DMG"
 
 spctl --assess --type execute --verbose=2 "$APP"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
-echo "Ready to distribute: $DMG"
+
+# The website links to releases/latest/download/LazyRemote.dmg, so attach this unversioned copy too.
+cp "$DMG" "$OUT/LazyRemote.dmg"
+echo "Ready to distribute: $DMG and $OUT/LazyRemote.dmg"

@@ -2,6 +2,8 @@
 
 _Last updated: October 5, 2026_
 
+The canonical copy of this policy is at https://ibrahimaltay.github.io/macbook-remote/privacy.html.
+
 LazyRemote does not collect, store, or share any personal data.
 
 - **No accounts, analytics, ads, or tracking.** The app contains no third-party SDKs.
