@@ -2,7 +2,7 @@
 
 ## Product
 
-An iPhone remote for a Mac over BLE, with D-pad, trackpad, and Unicode text pages.
+An iPhone remote for a Mac over BLE, with D-pad, trackpad, and Unicode text on a single screen.
 No Wi-Fi, router, Bonjour, or Local Network permission is required. The iPhone is
 the central; the Mac is the peripheral. The Mac menu bar app injects CGEvent keys,
 pointer events, and text into the receiving foreground application without taking

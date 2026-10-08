@@ -8,12 +8,10 @@ Use your iPhone as a remote for your Mac, over Bluetooth.
 
 **[Website](https://ibrahimaltay.github.io/macbook-remote/)** · **[Download for Mac](https://github.com/ibrahimaltay/macbook-remote/releases/latest)** · iPhone app coming soon to the App Store
 
-## Screenshots
+## Screenshot
 
 <p>
-  <img src="docs/screenshots/dpad.png" width="240" alt="D-pad">
-  <img src="docs/screenshots/trackpad.png" width="240" alt="Trackpad">
-  <img src="docs/screenshots/keyboard.png" width="240" alt="Keyboard">
+  <img src="docs/screenshots/remote.png" width="240" alt="LazyRemote with a trackpad, arrow keys, play/pause and a text field">
 </p>
 
 ## Features
@@ -52,7 +50,7 @@ The iPhone app will be on the App Store soon.
 9. On your Mac, click the LazyRemote icon in the menu bar.
 10. Select **Allow** followed by the name of your iPhone.
 11. Make sure that the iPhone shows the name of your Mac with a green dot.
-12. Swipe left or right to go to the D-pad, trackpad, or keyboard page.
+12. Use the trackpad and the buttons below it to control your Mac. To type, tap **Type to send** and then select the send button.
 
 
 ## License

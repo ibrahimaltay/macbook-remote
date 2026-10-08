@@ -22,10 +22,8 @@ struct TrackpadView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .opacity(model.isConnected ? 1 : 0.35)
             .animation(.easeOut(duration: 0.2), value: model.isConnected)
-            // Stops exactly where the paging edge strips begin, so neither steals
-            // the other's touches.
             .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.bottom, 14)
     }
 }
 
