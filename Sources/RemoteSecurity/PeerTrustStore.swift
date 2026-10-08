@@ -154,6 +154,16 @@ public final class PeerTrustStore {
         try store.save(JSONEncoder().encode(peers), account: "peers-v2")
     }
 
+    public func forgetAll() throws {
+        if let identity = try store.load("identity-v2") {
+            guard identity.count == 32 else { throw SecureError.malformedMessage }
+            _ = try Curve25519.Signing.PrivateKey(rawRepresentation: identity)
+        } else if try store.load("peers-v2") != nil {
+            throw SecureError.identityChanged
+        }
+        try store.delete("peers-v2")
+    }
+
     private func validate(publicKey: Data, name: String) throws {
         guard publicKey.count == 32, !name.isEmpty, name.utf8.count <= 128 else {
             throw SecureError.malformedMessage

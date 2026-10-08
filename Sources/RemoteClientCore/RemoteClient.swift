@@ -54,6 +54,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     }
 
     private let queue = DispatchQueue(label: "remote.client")
+    private let log = RemoteLog(category: "client")
     private let deviceName: String
     private let defaults: UserDefaults
     private let trust: PeerTrustStore
@@ -64,6 +65,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     private var stage: Stage = .idle
     private var isRunning = false
     private var forgetBlocked = false
+    private var skipSavedPeripheral = false
     private var handshake: SecureHandshake?
     private var session: SecureSession?
     private var peerPublicKey: Data?
@@ -81,6 +83,9 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     private var queuedBytes = 0
     private var pendingX = 0.0
     private var pendingY = 0.0
+    private var pendingScrollX = 0.0
+    private var pendingScrollY = 0.0
+    private var scrollPhase = ScrollPhase.changed
     private var textDelivery = TextDeliveryTracker()
     private var pendingTextID: UInt64? { textDelivery.pendingID }
     private var textTimer = UUID()
@@ -122,10 +127,15 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     private func startOnQueue() {
         guard !forgetBlocked else {
+            log.error("start refused: previous Forget Mac failed")
             report(.failed("Could not forget this Mac securely. Retry Forget Mac before reconnecting."))
             return
         }
-        guard manager == nil else { return }
+        guard manager == nil else {
+            log.info("start ignored: already running")
+            return
+        }
+        log.info("start")
         isRunning = true
         stage = .idle
         manager = CBCentralManager(delegate: self, queue: queue)
@@ -136,6 +146,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     }
 
     private func stopOnQueue() {
+        log.info("stop stage=\(stage)")
         isRunning = false
         if manager?.state == .poweredOn { manager?.stopScan() }
         let previous = peripheral
@@ -161,8 +172,10 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
                 }
                 self.defaults.removeObject(forKey: Self.lastPeripheralKey)
                 self.forgetBlocked = false
+                self.log.info("forgetMac succeeded mac=\(selected.map(RemoteLog.id) ?? "none") restart=\(restart)")
                 if restart { self.startOnQueue() }
             } catch {
+                self.log.error("forgetMac failed: \(RemoteLog.describe(error))")
                 self.forgetBlocked = true
                 self.stage = .failed
                 self.report(.failed("Could not forget this Mac securely. Retry Forget Mac before reconnecting."))
@@ -192,6 +205,28 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         queue.async { self.enqueueInput(.pointer(.click(button: button, count: count))) }
     }
 
+    /// `changed` and `momentum` deltas are coalesced and sent like cursor moves. The
+    /// other phases are sent reliably, since a lost one leaves an app stuck mid-scroll.
+    public func scroll(dx: Double, dy: Double, phase: ScrollPhase) {
+        queue.async {
+            guard self.stage == .ready, dx.isFinite, dy.isFinite else { return }
+            switch phase {
+            case .changed, .momentum:
+                self.scrollPhase = phase
+                self.pendingScrollX = max(-32768, min(32767, self.pendingScrollX + dx))
+                self.pendingScrollY = max(-32768, min(32767, self.pendingScrollY + dy))
+                self.pump()
+            case .began, .ended, .momentumBegan, .momentumEnded:
+                let x = max(-32768, min(32767, dx)).rounded(.towardZero)
+                let y = max(-32768, min(32767, dy)).rounded(.towardZero)
+                // Flushes the deltas still pending under the previous phase first.
+                self.enqueueInput(.pointer(.scroll(dx: Int16(x), dy: Int16(y), phase: phase)))
+                self.pendingScrollX = 0
+                self.pendingScrollY = 0
+            }
+        }
+    }
+
     public func send(text: String) {
         queue.async {
             guard self.stage == .ready, !text.isEmpty, text.utf8.count <= 4096,
@@ -219,6 +254,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         guard stage == .ready else { return }
         do {
             try captureMove()
+            try captureScroll()
             try enqueue(.message(message), control: false, type: .withResponse)
             pump()
         } catch { failSecurity(error) }
@@ -232,6 +268,16 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
                     control: false, type: .withoutResponse)
         pendingX -= dx
         pendingY -= dy
+    }
+
+    private func captureScroll() throws {
+        let dx = pendingScrollX.rounded(.towardZero)
+        let dy = pendingScrollY.rounded(.towardZero)
+        guard dx != 0 || dy != 0 else { return }
+        try enqueue(.message(.pointer(.scroll(dx: Int16(dx), dy: Int16(dy), phase: scrollPhase))),
+                    control: false, type: .withoutResponse)
+        pendingScrollX -= dx
+        pendingScrollY -= dy
     }
 
     private func allocateID() throws -> UInt64 {
@@ -274,6 +320,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
             if record == nil {
                 if jobs.isEmpty, stage == .ready, peripheral.canSendWriteWithoutResponse {
                     try captureMove()
+                    try captureScroll()
                 }
                 guard let job = jobs.first else { return }
                 if job.type == .withoutResponse, !peripheral.canSendWriteWithoutResponse { return }
@@ -324,7 +371,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
                 current.index += 1
                 record = current.index == current.frames.count ? nil : current
             }
-            if !jobs.isEmpty || (stage == .ready && (abs(pendingX) >= 1 || abs(pendingY) >= 1)) { pump() }
+            if !jobs.isEmpty || (stage == .ready && hasPendingDeltas) { pump() }
         } catch { failSecurity(error) }
     }
 
@@ -349,7 +396,14 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         queuedBytes = 0
         pendingX = 0
         pendingY = 0
+        pendingScrollX = 0
+        pendingScrollY = 0
+        scrollPhase = .changed
         finishText(false)
+    }
+
+    private var hasPendingDeltas: Bool {
+        [pendingX, pendingY, pendingScrollX, pendingScrollY].contains { abs($0) >= 1 }
     }
 
     private func finishText(_ delivered: Bool) {
@@ -369,11 +423,13 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         queue.asyncAfter(deadline: .now() + seconds) {
             guard self.generation == generation, self.stageTimer == token,
                   self.stage != .ready, self.stage != .idle, self.stage != .failed else { return }
+            self.log.error("stage timeout after \(Int(seconds))s in stage=\(self.stage)")
             self.fail("Secure connection timed out. Reconnect and check approval on the Mac.")
         }
     }
 
     private func failSecurity(_ error: Error) {
+        log.error("security failure in stage=\(stage): \(RemoteLog.describe(error))")
         if error as? SecureError == .identityChanged {
             fail("This Mac's identity changed. Verify the Mac, then use Forget Mac to pair again.")
         } else {
@@ -383,6 +439,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     private func fail(_ message: String) {
         guard stage != .failed else { return }
+        log.error("fail in stage=\(stage) mac=\(peripheral.map { RemoteLog.id($0.identifier) } ?? "none"): \(message)")
         resetConnection()
         stage = .failed
         if manager?.state == .poweredOn { manager?.stopScan() }
@@ -392,12 +449,15 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 
     private func scan() {
         guard isRunning, stage == .idle, let manager, manager.state == .poweredOn else { return }
-        if let saved = defaults.string(forKey: Self.lastPeripheralKey),
-           let id = UUID(uuidString: saved),
-           let known = manager.retrievePeripherals(withIdentifiers: [id]).first {
+        let saved = defaults.string(forKey: Self.lastPeripheralKey).flatMap(UUID.init(uuidString:))
+        if !skipSavedPeripheral, let saved,
+           let known = manager.retrievePeripherals(withIdentifiers: [saved]).first {
+            log.info("using saved mac=\(RemoteLog.id(saved))")
             connect(to: known)
             return
         }
+        log.info("scanning saved=\(saved.map(RemoteLog.id) ?? "none") skipSaved=\(skipSavedPeripheral)")
+        skipSavedPeripheral = false
         report(.scanning)
         manager.scanForPeripherals(withServices: [RemoteService.uuid])
     }
@@ -407,8 +467,22 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         self.peripheral = peripheral
         peripheral.delegate = self
         stage = .connecting
+        log.info("connect mac=\(RemoteLog.id(peripheral.identifier)) name=\(Self.describe(peripheral)) state=\(peripheral.state.rawValue)")
         report(.connecting(Self.describe(peripheral)))
         manager?.connect(peripheral)
+        let generation = self.generation
+        let id = peripheral.identifier
+        queue.asyncAfter(deadline: .now() + 5) {
+            guard self.generation == generation, self.stage == .connecting,
+                  let peripheral = self.peripheral, peripheral.identifier == id else { return }
+            // Core Bluetooth never times out a pending connect; a Mac whose address rotated is only found by scanning.
+            self.log.error("connect timed out after 5s mac=\(RemoteLog.id(id)); falling back to scan")
+            self.manager?.cancelPeripheralConnection(peripheral)
+            self.peripheral = nil
+            self.resetConnection()
+            self.skipSavedPeripheral = true
+            self.scan()
+        }
     }
 
     #if canImport(UIKit)
@@ -427,6 +501,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
     }
 
     private func report(_ status: Status) {
+        log.info("status \(status)")
         DispatchQueue.main.async { self.onStatus?(status) }
     }
 }
@@ -434,6 +509,7 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
 extension RemoteClient: CBCentralManagerDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         guard central === manager else { return }
+        log.info("central state=\(RemoteLog.describe(central.state)) stage=\(stage)")
         switch central.state {
         case .poweredOn: scan()
         case .poweredOff, .unauthorized, .unsupported:
@@ -459,12 +535,17 @@ extension RemoteClient: CBCentralManagerDelegate {
         advertisementData: [String: Any], rssi RSSI: NSNumber
     ) {
         guard central === manager, isRunning, stage == .idle else { return }
+        log.info("discovered mac=\(RemoteLog.id(peripheral.identifier)) name=\(Self.describe(peripheral)) rssi=\(RSSI)")
         central.stopScan()
         connect(to: peripheral)
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        guard central === manager, peripheral === self.peripheral, stage == .connecting else { return }
+        guard central === manager, peripheral === self.peripheral, stage == .connecting else {
+            log.info("ignored didConnect mac=\(RemoteLog.id(peripheral.identifier)) stage=\(stage)")
+            return
+        }
+        log.info("link connected mac=\(RemoteLog.id(peripheral.identifier)); discovering services")
         defaults.set(peripheral.identifier.uuidString, forKey: Self.lastPeripheralKey)
         stage = .services
         armStageTimeout()
@@ -474,6 +555,7 @@ extension RemoteClient: CBCentralManagerDelegate {
     public func centralManager(
         _ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?
     ) {
+        log.error("link failed mac=\(RemoteLog.id(peripheral.identifier)) stage=\(stage) error=\(RemoteLog.describe(error))")
         guard central === manager, peripheral === self.peripheral, stage == .connecting else { return }
         self.peripheral = nil
         resetConnection()
@@ -483,6 +565,7 @@ extension RemoteClient: CBCentralManagerDelegate {
     public func centralManager(
         _ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?
     ) {
+        log.error("link disconnected mac=\(RemoteLog.id(peripheral.identifier)) stage=\(stage) running=\(isRunning) error=\(RemoteLog.describe(error))")
         guard central === manager, peripheral === self.peripheral else { return }
         guard stage != .failed else { return }
         resetConnection()
@@ -494,6 +577,7 @@ extension RemoteClient: CBCentralManagerDelegate {
 extension RemoteClient: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard peripheral === self.peripheral, stage == .services else { return }
+        log.info("services found=\(peripheral.services?.map(\.uuid.uuidString) ?? []) error=\(RemoteLog.describe(error))")
         guard error == nil,
               let service = peripheral.services?.first(where: { $0.uuid == RemoteService.uuid }) else {
             fail(Self.updateRequired)
@@ -511,6 +595,7 @@ extension RemoteClient: CBPeripheralDelegate {
               service.uuid == RemoteService.uuid else { return }
         secureInput = service.characteristics?.first { $0.uuid == RemoteService.secureInputUUID }
         secureControl = service.characteristics?.first { $0.uuid == RemoteService.secureControlUUID }
+        log.info("characteristics input=\(secureInput.map { String($0.properties.rawValue) } ?? "missing") control=\(secureControl.map { String($0.properties.rawValue) } ?? "missing") error=\(RemoteLog.describe(error))")
         guard error == nil, let secureInput, let secureControl,
               secureInput.properties.contains(.write), secureInput.properties.contains(.writeWithoutResponse),
               secureControl.properties.contains(.write), secureControl.properties.contains(.notify) else {
@@ -527,6 +612,7 @@ extension RemoteClient: CBPeripheralDelegate {
         _ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?
     ) {
         guard peripheral === self.peripheral, characteristic === secureControl, stage != .failed else { return }
+        log.info("notify state notifying=\(characteristic.isNotifying) stage=\(stage) error=\(RemoteLog.describe(error))")
         guard error == nil, characteristic.isNotifying else {
             fail("Secure notifications failed. Reconnect to the Mac.")
             return
@@ -536,6 +622,7 @@ extension RemoteClient: CBPeripheralDelegate {
             let identity = try trust.identity()
             let pin = try trust.peer(for: peripheral.identifier)?.publicKey
             let handshake = SecureHandshake(identity: identity, role: .client, pinnedPeer: pin)
+            log.info("sending clientHello pinnedMac=\(pin != nil)")
             self.handshake = handshake
             stage = .serverHello
             armStageTimeout()
@@ -550,6 +637,7 @@ extension RemoteClient: CBPeripheralDelegate {
         guard peripheral === self.peripheral, characteristic === secureControl,
               [.serverHello, .serverFinish, .approval, .ready].contains(stage) else { return }
         guard error == nil, let value = characteristic.value else {
+            log.error("notification error stage=\(stage) error=\(RemoteLog.describe(error))")
             fail("Secure notification failed. Reconnect to the Mac.")
             return
         }
@@ -569,6 +657,7 @@ extension RemoteClient: CBPeripheralDelegate {
                 let remaining = min(10, max(0, 30 - (now - (receiveStarted ?? now))))
                 queue.asyncAfter(deadline: .now() + remaining) {
                     guard self.generation == generation, self.receiveTimer == token else { return }
+                    self.log.error("incomplete notification message timed out")
                     self.fail("Secure notification transfer timed out. Reconnect to the Mac.")
                 }
                 if stage == .serverHello || stage == .serverFinish { armStageTimeout() }
@@ -580,6 +669,7 @@ extension RemoteClient: CBPeripheralDelegate {
         if stage == .serverHello {
             guard kind == .serverHello, let handshake else { throw SecureError.wrongPhase }
             let finish = try handshake.receiveServerHello(data)
+            log.info("serverHello verified; sending clientFinish")
             peerPublicKey = handshake.peerPublicKey
             stage = .serverFinish
             armStageTimeout()
@@ -592,6 +682,7 @@ extension RemoteClient: CBPeripheralDelegate {
             guard let handshake else { throw SecureError.wrongPhase }
             try handshake.receiveServerFinish(data)
             session = try handshake.takeSession()
+            log.info("serverFinish verified; session ready, sending device name")
             self.handshake = nil
             stage = .approval
             armStageTimeout(300)
@@ -602,6 +693,10 @@ extension RemoteClient: CBPeripheralDelegate {
         guard var session else { throw SecureError.wrongPhase }
         let message = try SecureMessage(wire: session.open(data, lane: .serverControl))
         self.session = session
+        switch message {
+        case .pending, .approved, .revoked: log.info("control message \(message) stage=\(stage)")
+        default: break
+        }
         switch message {
         case .pending:
             guard stage == .approval else { throw SecureError.wrongPhase }
@@ -615,7 +710,7 @@ extension RemoteClient: CBPeripheralDelegate {
             report(.connected(Self.describe(peripheral)))
             pump()
         case .revoked:
-            fail("Access was revoked on the Mac. Ask its owner to approve access, then use Forget Mac to pair again.")
+            fail("Access was revoked on the Mac. Use Reconnect, then ask its owner to select Allow to pair again.")
         case .textResult(let id, let success):
             guard stage == .ready else { throw SecureError.wrongPhase }
             if let delivered = textDelivery.receipt(id: id, success: success) {
@@ -634,6 +729,7 @@ extension RemoteClient: CBPeripheralDelegate {
               current.type == .withResponse, characteristic === current.characteristic else { return }
         writeOutstanding = false
         guard error == nil else {
+            log.error("write failed control=\(characteristic === secureControl) stage=\(stage) error=\(RemoteLog.describe(error))")
             fail("Secure write failed. Reconnect to the Mac.")
             return
         }

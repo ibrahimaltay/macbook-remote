@@ -52,6 +52,26 @@ The iPhone app will be on the App Store soon.
 11. Make sure that the iPhone shows the name of your Mac with a green dot.
 12. Use the trackpad and the buttons below it to control your Mac. To type, tap **Type to send** and then select the send button.
 
+## Reset Pairing
+
+To remove every phone's access and pair again:
+
+1. On the Mac, open the LazyRemote menu and select **Forget All Devices…**.
+2. Confirm **Forget All Devices**. Connected phones lose access and all saved phone approvals are removed.
+3. On each iPhone, select **Reconnect** from the ellipsis menu.
+4. On the Mac, select **Allow** for each phone you want to pair again.
+
+The reset works even when **Enabled** is off. It preserves the Mac's identity,
+Enabled setting, Launch at Login preference, and Accessibility permission.
+Turn Enabled back on before reconnecting if it was off. The iPhone normally
+does not need **Forget Mac**, because the Mac's identity has not changed.
+This resets LazyRemote approvals, not system Bluetooth bonds.
+
+If the menu shows **Pairing Reset Failed…**, open it for details and retry
+**Forget All Devices…**. Access stays blocked for the current app run until the
+reset succeeds. Do not assume restarting clears approvals: a failed deletion
+can leave them saved.
+
 
 ## License
 

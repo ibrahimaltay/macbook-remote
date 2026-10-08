@@ -16,6 +16,7 @@ final class RemoteViewModel {
     private(set) var textStatus: TextStatus?
 
     private let client = RemoteClient()
+    private let tuning = TrackpadTuning.bundled
     private let haptics = UIImpactFeedbackGenerator(style: .rigid)
     private var textStatusReset: Task<Void, Never>?
 
@@ -94,20 +95,39 @@ final class RemoteViewModel {
 
     func moveCursor(by translation: CGPoint, velocity: CGPoint) {
         guard isConnected else { return }
-        let gain = Self.gain(forSpeed: hypot(velocity.x, velocity.y))
+        let gain = tuning.cursor.gain(forFingerSpeed: hypot(velocity.x, velocity.y))
         client.move(dx: translation.x * gain, dy: translation.y * gain)
+    }
+
+    func scroll(by translation: CGPoint, velocity: CGPoint, phase: RemoteProtocol.ScrollPhase) {
+        guard isConnected else { return }
+        let delta = scrollContent(translation, fingerVelocity: velocity)
+        client.scroll(dx: delta.x, dy: delta.y, phase: phase)
+    }
+
+    /// Nil when the release was too slow to coast or momentum is turned off.
+    func momentum(afterReleaseAt velocity: CGPoint) -> ScrollMomentum? {
+        guard isConnected else { return nil }
+        let content = scrollContent(velocity, fingerVelocity: velocity)
+        return ScrollMomentum(velocityX: content.x, velocityY: content.y, tuning: tuning.scroll.momentum)
+    }
+
+    /// Momentum deltas are already in Mac pixels, so no gain is applied.
+    func coast(dx: Double, dy: Double, phase: RemoteProtocol.ScrollPhase) {
+        client.scroll(dx: dx, dy: dy, phase: phase)
+    }
+
+    /// Finger travel in points to content travel in Mac pixels.
+    private func scrollContent(_ value: CGPoint, fingerVelocity: CGPoint) -> CGPoint {
+        let gain = tuning.scroll.gain.gain(forFingerSpeed: hypot(fingerVelocity.x, fingerVelocity.y))
+        let sign: Double = tuning.scroll.naturalDirection ? 1 : -1
+        return CGPoint(x: value.x * gain * sign, y: value.y * gain * sign)
     }
 
     func click(_ button: MouseButton, count: UInt8) {
         guard isConnected else { return }
         haptics.impactOccurred()
         client.click(button, count: count)
-    }
-
-    /// Pointer ballistics: near 1:1 when the finger is slow so you can aim, several
-    /// times that on a flick so one swipe crosses the whole display.
-    private static func gain(forSpeed speed: Double) -> Double {
-        min(1 + speed / 1000 * 3.5, 4.5)
     }
 
     func send(text: String) {

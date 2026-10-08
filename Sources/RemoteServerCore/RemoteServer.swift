@@ -17,6 +17,14 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     public var onEvent: ((KeyEvent) -> Void)?
     public var onDevices: (([PairedDevice]) -> Void)?
 
+    public enum TrustResetResult: Sendable, Equatable {
+        case succeeded
+        case failed(String)
+    }
+
+    public var onTrustReset: ((TrustResetResult) -> Void)?
+    private(set) var trustResetBlocked = false
+
     private final class Peer {
         let central: CBCentral
         let pendingID = UUID()
@@ -48,6 +56,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     }
 
     private let queue = DispatchQueue(label: "remote.server")
+    private let log = RemoteLog(category: "server")
     private let serviceName: String
     private let injector = KeyInjector()
     private let pointer = PointerInjector()
@@ -59,6 +68,8 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     private var peers: [UUID: Peer] = [:]
     private var timer: DispatchSourceTimer?
     private var isRunning = false
+    private var lastStatus: Status = .stopped
+    private var statusBeforeTrustFailure: Status?
 
     public init(
         serviceName: String = RemoteService.defaultName,
@@ -74,7 +85,11 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
 
     public func start() {
         queue.async { [self] in
-            guard self.manager == nil else { return }
+            guard self.manager == nil else {
+                self.log.info("start ignored: already running")
+                return
+            }
+            self.log.info("start resetBlocked=\(self.trustResetBlocked)")
             self.isRunning = true
             let timer = DispatchSource.makeTimerSource(queue: self.queue)
             timer.schedule(deadline: .now() + 1, repeating: 1)
@@ -87,6 +102,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
 
     public func stop() {
         queue.async {
+            self.log.info("stop peers=\(self.peers.count)")
             self.isRunning = false
             self.timer?.cancel()
             self.timer = nil
@@ -102,10 +118,14 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
 
     public func approve(_ id: UUID) {
         queue.async {
-            guard let peer = self.peers.values.first(where: { $0.pendingID == id }),
+            guard !self.trustResetBlocked,
+                  let peer = self.peers.values.first(where: { $0.pendingID == id }),
                   !peer.closing, !peer.approved, peer.session != nil,
                   let publicKey = peer.publicKey, let name = peer.name
-            else { return }
+            else {
+                self.log.error("approve ignored pending=\(RemoteLog.id(id)) resetBlocked=\(self.trustResetBlocked) found=\(self.peers.values.contains { $0.pendingID == id })")
+                return
+            }
             guard let pendingSince = peer.pendingSince,
                 ProcessInfo.processInfo.systemUptime - pendingSince < 300
             else {
@@ -122,8 +142,10 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
                 peer.approved = true
                 peer.pendingSince = nil
                 try self.send(.approved, to: peer)
+                self.log.info("approved phone=\(RemoteLog.id(peer.central.identifier)) trusted=\(RemoteLog.id(trusted.id))")
                 self.reportDevices()
             } catch {
+                self.log.error("approve failed phone=\(RemoteLog.id(peer.central.identifier)): \(RemoteLog.describe(error))")
                 self.fail(peer, message: "Could not securely approve the device. Reconnect and try again.")
             }
         }
@@ -143,8 +165,10 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
                 }
                 try self.trust.forget(id)
             } catch {
+                self.log.error("forget \(RemoteLog.id(id)) failed: \(RemoteLog.describe(error))")
                 deletionFailed = true
             }
+            self.log.info("forget \(RemoteLog.id(id)) affectedPeers=\(affected.count) persisted=\(!deletionFailed)")
             for peer in affected {
                 if let publicKey = peer.publicKey { self.deniedKeys.insert(publicKey) }
                 peer.approved = false
@@ -169,8 +193,56 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
         }
     }
 
+    public func forgetAll() {
+        queue.async {
+            self.trustResetBlocked = true
+            let affected = Array(self.peers.values)
+            self.log.info("forgetAll revoking peers=\(affected.count)")
+            for peer in affected { peer.closing = true }
+            for peer in affected {
+                peer.approved = false
+                peer.pendingSince = nil
+                peer.handshake = nil
+                peer.controlAssembler.reset()
+                peer.inputAssembler.reset()
+                peer.controlStarted = nil
+                peer.controlUpdated = nil
+                peer.inputStarted = nil
+                peer.inputUpdated = nil
+                self.releaseHeld(peer)
+                do {
+                    if peer.session != nil {
+                        try self.send(.revoked, to: peer)
+                    } else {
+                        self.drop(peer)
+                    }
+                } catch {
+                    self.drop(peer)
+                }
+            }
+            let result: TrustResetResult
+            do {
+                try self.trust.forgetAll()
+                self.deniedKeys.removeAll()
+                self.deniedIDs.removeAll()
+                self.trustResetBlocked = false
+                if let status = self.statusBeforeTrustFailure {
+                    self.report(status)
+                }
+                self.log.info("forgetAll succeeded")
+                result = .succeeded
+            } catch {
+                self.log.error("forgetAll failed; approvals blocked: \(RemoteLog.describe(error))")
+                result = .failed("Could not reset saved trust. Access is blocked for this run. Retry Forget All Devices; saved approvals may return after restarting the app.")
+            }
+            self.reportDevices()
+            DispatchQueue.main.async { self.onTrustReset?(result) }
+        }
+    }
+
     private func publish() {
         guard let manager, isRunning else { return }
+        log.info("publishing service")
         let input = CBMutableCharacteristic(
             type: RemoteService.secureInputUUID,
             properties: [.write, .writeWithoutResponse], value: nil, permissions: [.writeable]
@@ -227,7 +299,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     }
 
     private func receive(_ value: Data, input: Bool, from peer: Peer) throws {
-        guard !peer.closing, !input || peer.approved else { throw SecureError.wrongPhase }
+        guard !trustResetBlocked, !peer.closing, !input || peer.approved else { throw SecureError.wrongPhase }
         let now = ProcessInfo.processInfo.systemUptime
         peer.lastActive = now
         let complete: (kind: SecureFrameKind, id: UInt64, data: Data)?
@@ -266,6 +338,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
                 throw SecureError.wrongPhase
             }
             let pinned = try trust.peer(for: peer.central.identifier)
+            log.info("clientHello phone=\(RemoteLog.id(peer.central.identifier)) pinnedPhone=\(pinned != nil)")
             let handshake = SecureHandshake(
                 identity: try trust.identity(), role: .server, pinnedPeer: pinned?.publicKey
             )
@@ -278,6 +351,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
                 throw SecureError.wrongPhase
             }
             let reply = try handshake.receiveClientFinish(complete.data)
+            log.info("clientFinish verified phone=\(RemoteLog.id(peer.central.identifier))")
             peer.session = try handshake.takeSession()
             peer.handshake = nil
             try enqueue(reply, kind: .encryptedControl, to: peer)
@@ -289,15 +363,19 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
             guard case .name(let name) = message else { throw SecureError.wrongPhase }
             peer.session = session
             peer.name = name
-            if let trusted = try trust.peer(publicKey: publicKey),
+            let known = try trust.peer(publicKey: publicKey)
+            let phone = RemoteLog.id(peer.central.identifier)
+            if let trusted = known,
                !deniedKeys.contains(publicKey), !deniedIDs.contains(trusted.id) {
                 let updated = try trust.approve(
                     publicKey: publicKey, name: name, transportID: peer.central.identifier
                 )
                 peer.trustedID = updated.id
                 peer.approved = true
+                log.info("name received phone=\(phone) name=\(name); auto-approved trusted=\(RemoteLog.id(updated.id))")
                 try send(.approved, to: peer)
             } else {
+                log.info("name received phone=\(phone) name=\(name); pending approval known=\(known != nil) denied=\(deniedKeys.contains(publicKey))")
                 peer.pendingSince = now
                 try send(.pending, to: peer)
             }
@@ -331,6 +409,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     }
 
     private func drop(_ peer: Peer) {
+        log.info("drop phone=\(RemoteLog.id(peer.central.identifier)) approved=\(peer.approved) closing=\(peer.closing) queuedNotifications=\(peer.notifications.count)")
         releaseHeld(peer)
         peers.removeValue(forKey: peer.central.identifier)
         peer.session = nil
@@ -346,6 +425,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
     }
 
     private func fail(_ peer: Peer, message: String = "Secure connection failed. Reconnect the device and try again.") {
+        log.error("fail phone=\(RemoteLog.id(peer.central.identifier)) handshake=\(peer.handshake != nil) session=\(peer.session != nil) named=\(peer.name != nil): \(message)")
         drop(peer)
         report(.failed(message))
         reportDevices()
@@ -362,26 +442,33 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
             let pendingExpired = peer.pendingSince.map { now - $0 >= 300 } == true
             let notificationExpired = peer.notificationProgress.map { now - $0 >= 10 } == true
             if controlExpired || inputExpired || handshakeExpired || pendingExpired || notificationExpired {
+                log.error("expire phone=\(RemoteLog.id(peer.central.identifier)) control=\(controlExpired) input=\(inputExpired) handshake=\(handshakeExpired) pending=\(pendingExpired) notification=\(notificationExpired)")
                 fail(peer, message: "Secure connection timed out. Reconnect the device.")
             }
         }
     }
 
     private func report(_ status: Status) {
+        log.info("status \(status)")
+        lastStatus = status
+        statusBeforeTrustFailure = nil
         DispatchQueue.main.async { self.onStatus?(status) }
     }
 
     private func reportDevices() {
         var devices: [PairedDevice] = []
         do {
-            devices = try trust.peers().map { trusted in
+            devices = try (trustResetBlocked ? [] : trust.peers()).map { trusted in
                 PairedDevice(
                     id: trusted.id, name: trusted.name, isApproved: true,
                     isConnected: peers.values.contains { $0.trustedID == trusted.id && $0.approved && $0.session != nil }
                 )
             }
         } catch {
+            log.error("reading saved trust failed: \(RemoteLog.describe(error))")
+            let recoveryStatus = statusBeforeTrustFailure ?? lastStatus
             report(.failed("Could not read saved device trust. New connections require secure approval."))
+            statusBeforeTrustFailure = recoveryStatus
         }
         devices += peers.values.compactMap { peer in
             guard !peer.approved, !peer.closing, peer.session != nil, let name = peer.name else { return nil }
@@ -396,6 +483,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
 extension RemoteServer: CBPeripheralManagerDelegate {
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         guard manager === peripheral, isRunning else { return }
+        log.info("peripheral state=\(RemoteLog.describe(peripheral.state)) peers=\(peers.count)")
         if peripheral.state != .poweredOn {
             clearPeers()
             control = nil
@@ -413,6 +501,7 @@ extension RemoteServer: CBPeripheralManagerDelegate {
     public func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
         guard manager === peripheral, isRunning else { return }
         guard error == nil else {
+            log.error("add service failed: \(RemoteLog.describe(error))")
             clearPeers()
             report(.failed("Could not publish the secure Bluetooth service."))
             reportDevices()
@@ -427,6 +516,7 @@ extension RemoteServer: CBPeripheralManagerDelegate {
     public func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
         guard manager === peripheral, isRunning else { return }
         if error != nil {
+            log.error("advertising failed: \(RemoteLog.describe(error))")
             clearPeers()
             report(.failed("Could not advertise the secure Bluetooth service."))
             reportDevices()
@@ -441,11 +531,17 @@ extension RemoteServer: CBPeripheralManagerDelegate {
         didSubscribeTo characteristic: CBCharacteristic
     ) {
         guard manager === peripheral, isRunning, characteristic === control else { return }
-        guard peers[central.identifier] == nil else { return }
+        let phone = RemoteLog.id(central.identifier)
+        guard peers[central.identifier] == nil else {
+            log.error("subscribe ignored phone=\(phone): previous connection still open closing=\(peers[central.identifier]?.closing == true)")
+            return
+        }
         guard peers.count < 8 else {
+            log.error("subscribe refused phone=\(phone): too many connections")
             report(.failed("Too many Bluetooth connections. Disconnect a device and try again."))
             return
         }
+        log.info("subscribed phone=\(phone) mtu=\(central.maximumUpdateValueLength) peers=\(peers.count + 1)")
         peers[central.identifier] = Peer(central: central)
     }
 
@@ -455,6 +551,7 @@ extension RemoteServer: CBPeripheralManagerDelegate {
         didUnsubscribeFrom characteristic: CBCharacteristic
     ) {
         guard manager === peripheral, characteristic === control else { return }
+        log.info("unsubscribed phone=\(RemoteLog.id(central.identifier)) known=\(peers[central.identifier] != nil)")
         if let peer = peers[central.identifier] { drop(peer) }
         reportDevices()
     }
@@ -471,11 +568,13 @@ extension RemoteServer: CBPeripheralManagerDelegate {
                   request.characteristic.uuid == RemoteService.secureControlUUID
                     || request.characteristic.uuid == RemoteService.secureInputUUID
             else {
+                log.error("write rejected phone=\(RemoteLog.id(request.central.identifier)): unsupported characteristic or not running=\(isRunning)")
                 result = .requestNotSupported
                 if let peer = peers[request.central.identifier] { fail(peer) }
                 break
             }
             guard let peer = peers[request.central.identifier], !peer.closing else {
+                log.error("write rejected phone=\(RemoteLog.id(request.central.identifier)): \(peers[request.central.identifier] == nil ? "not subscribed" : "connection closing")")
                 result = .insufficientAuthorization
                 break
             }
@@ -483,6 +582,7 @@ extension RemoteServer: CBPeripheralManagerDelegate {
                 guard request.offset == 0, let value = request.value else { throw SecureError.malformedMessage }
                 try receive(value, input: request.characteristic.uuid == RemoteService.secureInputUUID, from: peer)
             } catch {
+                log.error("receive failed phone=\(RemoteLog.id(peer.central.identifier)) input=\(request.characteristic.uuid == RemoteService.secureInputUUID) resetBlocked=\(trustResetBlocked): \(RemoteLog.describe(error))")
                 result = .insufficientAuthorization
                 fail(peer)
                 break

@@ -10,6 +10,8 @@ final class ServerViewModel {
     private(set) var status: RemoteServer.Status = .stopped
     private(set) var devices: [PairedDevice] = []
     private(set) var isAccessibilityTrusted = KeyInjector.isTrusted
+    private(set) var isResettingTrust = false
+    private(set) var trustResetError: String?
 
     private static let enabledKey = "serverEnabled"
 
@@ -37,6 +39,7 @@ final class ServerViewModel {
     }
 
     var canLaunchAtLogin: Bool { LaunchAtLogin.isAvailable }
+    var canApproveDevices: Bool { !isResettingTrust && trustResetError == nil }
 
     var statusText: String {
         switch status {
@@ -66,7 +69,7 @@ final class ServerViewModel {
     }
 
     var icon: Image {
-        if !isAccessibilityTrusted { return Image(systemName: "exclamationmark.triangle.fill") }
+        if !isAccessibilityTrusted || trustResetError != nil { return Image(systemName: "exclamationmark.triangle.fill") }
         if case .failed = status { return Image(systemName: "exclamationmark.triangle.fill") }
         return Image(connectedCount > 0 ? "RemoteIconFill" : "RemoteIcon")
     }
@@ -82,6 +85,16 @@ final class ServerViewModel {
         server.onDevices = { [weak self] devices in
             MainActor.assumeIsolated { self?.devices = devices }
         }
+        server.onTrustReset = { [weak self] result in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.isResettingTrust = false
+                switch result {
+                case .succeeded: self.trustResetError = nil
+                case .failed(let message): self.trustResetError = message
+                }
+            }
+        }
 
         observeSystemEvents()
 
@@ -94,11 +107,45 @@ final class ServerViewModel {
     }
 
     func approve(_ device: PairedDevice) {
+        guard canApproveDevices else { return }
         server.approve(device.id)
     }
 
     func forget(_ device: PairedDevice) {
         server.forget(device.id)
+    }
+
+    func forgetAllDevices() {
+        guard !isResettingTrust else { return }
+        isResettingTrust = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Forget all devices?"
+            alert.informativeText = "All saved phone approvals will be removed and connected devices will lose access. Reconnect each phone and select Allow on this Mac to pair again. Your Mac identity and app settings will be kept."
+            alert.addButton(withTitle: "Cancel").keyEquivalent = "\r"
+            let forgetButton = alert.addButton(withTitle: "Forget All Devices")
+            forgetButton.keyEquivalent = ""
+            forgetButton.hasDestructiveAction = true
+            NSApplication.shared.activate()
+            guard alert.runModal() == .alertSecondButtonReturn else {
+                self.isResettingTrust = false
+                return
+            }
+            self.server.forgetAll()
+        }
+    }
+
+    func showTrustResetError() {
+        guard let trustResetError else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Pairing reset failed"
+        alert.informativeText = trustResetError
+        alert.addButton(withTitle: "OK")
+        NSApplication.shared.activate()
+        alert.runModal()
     }
 
     func openAccessibilitySettings() {

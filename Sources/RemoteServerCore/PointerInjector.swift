@@ -16,6 +16,8 @@ public struct PointerInjector: @unchecked Sendable {
             move(dx: CGFloat(dx), dy: CGFloat(dy))
         case .click(let button, let count):
             click(button, count: count)
+        case .scroll(let dx, let dy, let phase):
+            scroll(dx: Int32(dx), dy: Int32(dy), phase: phase)
         }
     }
 
@@ -61,6 +63,33 @@ public struct PointerInjector: @unchecked Sendable {
                 event.post(tap: .cghidEventTap)
             }
         }
+    }
+
+    /// Continuous pixel scrolling with the phases a real trackpad reports, so apps
+    /// smooth-scroll, rubber-band, and treat coasting as momentum.
+    private func scroll(dx: Int32, dy: Int32, phase: ScrollPhase) {
+        guard let event = CGEvent(
+            scrollWheelEvent2Source: source,
+            units: .pixel,
+            wheelCount: 2,
+            wheel1: dy,
+            wheel2: dx,
+            wheel3: 0
+        ) else { return }
+
+        // Values of kCGScrollPhase* and kCGMomentumScrollPhase*.
+        let (scrollPhase, momentumPhase): (Int64, Int64) = switch phase {
+        case .began: (1, 0)
+        case .changed: (2, 0)
+        case .ended: (4, 0)
+        case .momentumBegan: (0, 1)
+        case .momentum: (0, 2)
+        case .momentumEnded: (0, 3)
+        }
+        event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        event.setIntegerValueField(.scrollWheelEventScrollPhase, value: scrollPhase)
+        event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentumPhase)
+        event.post(tap: .cghidEventTap)
     }
 
     /// Keeps a fast flick from pushing the cursor off into nowhere. `CGDisplayBounds`

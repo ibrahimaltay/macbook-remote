@@ -1,0 +1,27 @@
+{
+  "_help": "Trackpad feel. Speeds multiply finger travel in points; the Mac receives pixels. Rebuild and redeploy the iOS app after editing. `swift test` checks this file.",
+
+  "cursor": {
+    "_help": "gain = min(speed + fingerSpeed / 1000 * accelerationPer1000, maxSpeed), fingerSpeed in pt/s.",
+    "speed": 1.0,
+    "accelerationPer1000": 3.5,
+    "maxSpeed": 4.5
+  },
+
+  "scroll": {
+    "_help": "Same gain formula as cursor. naturalDirection true = content follows your fingers.",
+    "speed": 1.0,
+    "accelerationPer1000": 1.0,
+    "maxSpeed": 3.0,
+    "naturalDirection": true,
+
+    "momentum": {
+      "_help": "Coasting after lift-off, in Mac pixels/s. velocityKeptPerSecond: 0.135 is iOS-like, lower stops sooner.",
+      "enabled": true,
+      "velocityKeptPerSecond": 0.135,
+      "minStartVelocity": 150,
+      "stopVelocity": 15,
+      "maxVelocity": 8000
+    }
+  }
+}

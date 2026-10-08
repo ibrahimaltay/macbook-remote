@@ -40,6 +40,11 @@ final class SecureMessageTests: XCTestCase {
                 XCTAssertEqual(try SecureMessage(wire: message.encoded()), message)
             }
         }
+        for phase in ScrollPhase.allCases {
+            let message = SecureMessage.pointer(.scroll(dx: -7, dy: 300, phase: phase))
+            XCTAssertEqual(try message.encoded().count, 7)
+            XCTAssertEqual(try SecureMessage(wire: message.encoded()), message)
+        }
     }
 
     func testBinaryIDsAndInnerCodecs() throws {
@@ -54,6 +59,7 @@ final class SecureMessageTests: XCTestCase {
             [], [0], [10], [0, 1], [1], [1, 0], [1, 0, 2], [1, 0, 255],
             [1, 99, 1], [1, 0, 1, 0], [2], [2, 1, 0, 0, 0],
             [2, 1, 0, 0, 0, 0, 0], [2, 2, 2, 1], [2, 3, 0, 1],
+            [2, 4, 0, 0, 0, 0], [2, 4, 0, 0, 0, 0, 0], [2, 4, 0, 0, 0, 0, 1, 0],
             [3], [3, 0, 0, 0, 0, 0, 0, 0, 0], [4],
             [8], [8, 0, 0, 0, 0, 0, 0, 0, 0],
             [8, 0, 0, 0, 0, 0, 0, 0, 0, 2],

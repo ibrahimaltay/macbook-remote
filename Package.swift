@@ -14,7 +14,11 @@ let package = Package(
     targets: [
         .target(name: "RemoteProtocol"),
         .target(name: "RemoteSecurity", dependencies: ["RemoteProtocol"]),
-        .target(name: "RemoteClientCore", dependencies: ["RemoteProtocol", "RemoteSecurity"]),
+        .target(
+            name: "RemoteClientCore",
+            dependencies: ["RemoteProtocol", "RemoteSecurity"],
+            resources: [.process("Resources")]
+        ),
         .target(name: "RemoteServerCore", dependencies: ["RemoteProtocol", "RemoteSecurity"]),
         .executableTarget(
             name: "remotectl",

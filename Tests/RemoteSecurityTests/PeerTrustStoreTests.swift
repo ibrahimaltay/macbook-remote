@@ -33,6 +33,76 @@ final class PeerTrustStoreTests: XCTestCase {
         Curve25519.Signing.PrivateKey().publicKey.rawRepresentation
     }
 
+    func testForgetAllPreservesIdentityAndAllowsFreshApproval() throws {
+        let store = MemoryKeyStore()
+        let trust = PeerTrustStore(store: store)
+        let identity = try trust.identity().rawRepresentation
+        let transportID = UUID()
+        let first = try trust.approve(publicKey: publicKey(), name: "Phone", transportID: transportID)
+        _ = try trust.approve(publicKey: publicKey(), name: "Other", transportID: UUID())
+        store.records["unrelated"] = Data([1])
+        try trust.forgetAll()
+        let reloaded = PeerTrustStore(store: store)
+        XCTAssertEqual(try reloaded.peers(), [])
+        XCTAssertNil(try reloaded.peer(for: transportID))
+        XCTAssertNil(try reloaded.peer(publicKey: first.publicKey))
+        XCTAssertNil(store.records["peers-v2"])
+        XCTAssertEqual(try reloaded.identity().rawRepresentation, identity)
+        XCTAssertEqual(store.records["unrelated"], Data([1]))
+        try reloaded.forgetAll()
+        let replacement = try reloaded.approve(publicKey: first.publicKey, name: "Phone", transportID: transportID)
+        XCTAssertNotEqual(replacement.id, first.id)
+    }
+
+    func testForgetAllRecoversMalformedPeersWithValidIdentity() throws {
+        let store = MemoryKeyStore()
+        let trust = PeerTrustStore(store: store)
+        let identity = try trust.identity().rawRepresentation
+        store.records["peers-v2"] = Data("not json".utf8)
+        try trust.forgetAll()
+        XCTAssertEqual(try trust.peers(), [])
+        XCTAssertEqual(store.records["identity-v2"], identity)
+    }
+
+    func testForgetAllFailurePreservesRecordsAndCanRetry() throws {
+        let store = MemoryKeyStore()
+        let trust = PeerTrustStore(store: store)
+        _ = try trust.identity()
+        _ = try trust.approve(publicKey: publicKey(), name: "Phone", transportID: UUID())
+        let original = store.records
+        store.deleteError = .keychain(errSecAuthFailed)
+        XCTAssertThrowsError(try trust.forgetAll()) {
+            XCTAssertEqual($0 as? SecureError, store.deleteError)
+        }
+        XCTAssertEqual(store.records, original)
+        store.deleteError = nil
+        try trust.forgetAll()
+        XCTAssertEqual(try trust.peers(), [])
+        XCTAssertEqual(store.records["identity-v2"], original["identity-v2"])
+    }
+
+    func testForgetAllNeverHidesMissingOrCorruptIdentity() throws {
+        for identity in [nil, Data(), Data(repeating: 1, count: 31)] as [Data?] {
+            let store = MemoryKeyStore()
+            store.records["identity-v2"] = identity
+            store.records["peers-v2"] = Data("not json".utf8)
+            let original = store.records
+            XCTAssertThrowsError(try PeerTrustStore(store: store).forgetAll())
+            XCTAssertEqual(store.records, original)
+            XCTAssertTrue(store.savedAccounts.isEmpty)
+        }
+    }
+
+    func testForgetAllOnFreshStoreDoesNotCreateIdentity() throws {
+        let store = MemoryKeyStore()
+        try PeerTrustStore(store: store).forgetAll()
+        try PeerTrustStore(store: store).forgetAll()
+        XCTAssertTrue(store.records.isEmpty)
+        XCTAssertTrue(store.savedAccounts.isEmpty)
+        store.loadError = .keychain(errSecInteractionNotAllowed)
+        XCTAssertThrowsError(try PeerTrustStore(store: store).forgetAll())
+    }
+
     func testIdentityPersistsAcrossReloadAndSigns() throws {
         let store = MemoryKeyStore()
         let identity = try PeerTrustStore(store: store).identity()

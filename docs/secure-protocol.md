@@ -183,6 +183,7 @@ strings occupy the remaining bytes as nonempty valid UTF-8, without a length fie
 | 1 key | command1 + isDown1 (0 or 1) | 3 | clientInput |
 | 2 pointer move | `[1] + dxInt16LE + dyInt16LE` | 6 | clientInput |
 | 2 pointer click | `[2] + button1 + count1` | 4 | clientInput |
+| 2 pointer scroll | `[4] + dxInt16LE + dyInt16LE + phase1` | 7 | clientInput |
 | 3 text | textID8 + UTF-8 (1..4096 bytes) | 10..4105 | clientInput |
 | 4 name | UTF-8 (1..128 bytes) | 2..129 | clientControl |
 | 5 pending | None | 1 | serverControl |
@@ -193,7 +194,10 @@ strings occupy the remaining bytes as nonempty valid UTF-8, without a length fie
 
 Commands are up=0, down=1, left=2, right=3, mid/Space=4, backspace=5, enter=6. Mac
 keycodes are respectively 126, 125, 123, 124, 49, 51, 36. Pointer buttons are left=0, right=1;
-count is a raw UInt8 (the codec adds no narrower range restriction). Pointer
+count is a raw UInt8 (the codec adds no narrower range restriction). Scroll phases
+are began=1, changed=2, ended=3, momentumBegan=4, momentum=5, momentumEnded=6;
+scroll deltas are pixels in content direction (positive dy reveals content above).
+Pointer sub-tag 3 is unused because legacy `TextChunk` occupied it. Pointer
 deltas are signed little-endian, unlike record/frame/text IDs. Unknown tags,
 invalid lengths, invalid UTF-8, and invalid command/button/boolean values fail.
 Only key, pointer, and text messages are accepted by the approved input decoder.
@@ -247,6 +251,34 @@ durable revocation across process restart. Do not assume restarting fixes trust
 errors or preserves an unsuccessful revocation. Explicit successful reapproval
 can clear a block. Failure to deliver revoked does not restore input access.
 
+The Mac also offers Forget All Devices with a destructive confirmation, including
+when Disabled or no devices can be listed. Cancellation does not change trust or
+sessions. Confirmation immediately closes every approved, pending, and handshaking
+peer to input, releases held keys, resets partial messages, and attempts encrypted
+revoked notifications before dropping peers. The listener remains enabled if it
+was enabled; this is session revocation, not guaranteed physical BLE disconnection.
+
+Bulk reset deletes only the `peers-v2` Keychain item in one operation, retaining
+the Mac's `identity-v2` and app preferences. With a valid existing identity, this
+explicit reset can remove malformed peer records without decoding them. A missing
+identity with a saved peer record, corrupt identity, or Keychain error still fails
+closed; reset never creates or replaces the identity. Repeated resets are safe,
+including on a fresh store with neither record.
+
+If bulk deletion fails, both automatic and explicit approval remain blocked for
+the current server instance, including across Enabled toggles and sleep/wake.
+The menu retains a separate Pairing Reset Failed action for error details and
+retry instructions even if Bluetooth status changes. Only a successful bulk-reset
+retry removes this block. Saved records are not shown as usable approvals while
+blocked. **An unsuccessful reset is not durable across app restart**: old saved
+approvals may return, so retry Forget All Devices before restarting.
+
+After successful reset, phones use Reconnect and the Mac owner selects Allow
+again. The retained Mac identity still matches existing phone pins; Forget Mac
+is not required for an ordinary Mac-side reset. This does not erase phone-side
+trust, rotate signing identities, or manage OS Bluetooth bonds, and introduces
+no new wire message or plaintext fallback.
+
 ## Delivery, Limits, and Lifecycle
 
 Keys, clicks, text, and client control/handshake frames use `.withResponse` with
@@ -255,7 +287,10 @@ provides reliable ATT transport, not proof of foreground event delivery. Pointer
 movement is coalesced, fractional deltas retained, and pending axes clamped to
 -32768..32767; move frames use `.withoutResponse` and resume on Core Bluetooth
 readiness. Moves share the serialized input queue with reliable events, so frames
-of different input records are not interleaved. No unreliable fallback is used
+of different input records are not interleaved. Scroll `changed` and `momentum`
+deltas are coalesced and sent the same way as moves; the other scroll phases flush
+pending scroll deltas and are sent with response so a phase transition is never lost.
+No unreliable fallback is used
 for keys or clicks. Server notifications resume when updateValue backpressure clears.
 
 Unicode text is capped at 4096 UTF-8 bytes, encoded and encrypted as one message,

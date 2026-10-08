@@ -23,6 +23,7 @@ struct StatusMenu: View {
                     Button("Allow \(device.name) (\(device.shortID))") {
                         model.approve(device)
                     }
+                    .disabled(!model.canApproveDevices)
                 }
             }
 
@@ -35,6 +36,19 @@ struct StatusMenu: View {
                         }
                     }
                 }
+            }
+        }
+
+        Divider()
+
+        Button("Forget All Devices…", role: .destructive) {
+            model.forgetAllDevices()
+        }
+        .disabled(model.isResettingTrust)
+
+        if model.trustResetError != nil {
+            Button("Pairing Reset Failed…") {
+                model.showTrustResetError()
             }
         }
 
