@@ -39,10 +39,17 @@ private struct TrackpadSurface: UIViewRepresentable {
         // A real trackpad stops coasting the moment a finger lands.
         view.onTouchDown = { coordinator.stopMomentum() }
 
-        // One recognizer for both, so a second finger landing mid-drag can switch to scrolling.
+        // One recognizer for all finger counts, so fingers landing mid-gesture can switch modes.
         let pan = UIPanGestureRecognizer(target: coordinator, action: #selector(Coordinator.pan))
-        pan.maximumNumberOfTouches = 2
+        pan.maximumNumberOfTouches = 3
+        pan.delegate = coordinator
         view.addGestureRecognizer(pan)
+
+        let drag = UILongPressGestureRecognizer(target: coordinator, action: #selector(Coordinator.drag))
+        drag.minimumPressDuration = model.gestures.dragHoldSeconds
+        drag.allowableMovement = 10
+        drag.delegate = coordinator
+        view.addGestureRecognizer(drag)
 
         let click = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.click))
         view.addGestureRecognizer(click)
@@ -59,6 +66,7 @@ private struct TrackpadSurface: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
         coordinator.stopMomentum()
+        coordinator.endDrag()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -66,17 +74,20 @@ private struct TrackpadSurface: UIViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         private enum PanMode {
             case cursor
             case scroll
-            /// Scrolling ended while one finger stays down; it must not drag the cursor.
+            case swipe
+            /// Scrolling or a swipe ended while fingers stay down; they must not drag the cursor.
             case spent
         }
 
         private let model: RemoteViewModel
         private var lastClick: (time: TimeInterval, point: CGPoint)?
         private var panMode = PanMode.cursor
+        private var swipeTravel = CGPoint.zero
+        private var isDragging = false
         private var scrollVelocity = CGPoint.zero
         private var momentum: ScrollMomentum?
         private var displayLink: CADisplayLink?
@@ -96,7 +107,14 @@ private struct TrackpadSurface: UIViewRepresentable {
 
             switch recognizer.state {
             case .began, .changed:
-                let fingers = recognizer.numberOfTouches
+                // While dragging, extra fingers must not turn the drag into a scroll or swipe.
+                let fingers = isDragging ? 1 : recognizer.numberOfTouches
+                if fingers >= 3, panMode == .cursor || panMode == .scroll {
+                    if panMode == .scroll { endScroll(coasting: false) }
+                    panMode = .swipe
+                    swipeTravel = .zero
+                    return
+                }
                 switch panMode {
                 case .cursor where fingers >= 2:
                     // The centroid jumps when a finger lands, so this frame's delta is dropped.
@@ -112,6 +130,13 @@ private struct TrackpadSurface: UIViewRepresentable {
                 case .scroll:
                     scrollVelocity = velocity
                     model.scroll(by: translation, velocity: velocity, phase: .changed)
+                case .swipe:
+                    swipeTravel.x += translation.x
+                    swipeTravel.y += translation.y
+                    if let direction = swipeDirection() {
+                        panMode = .spent
+                        model.swipe(direction)
+                    }
                 case .spent:
                     break
                 }
@@ -124,6 +149,41 @@ private struct TrackpadSurface: UIViewRepresentable {
             default:
                 break
             }
+        }
+
+        /// Nil until the fingers have travelled far enough along one axis.
+        private func swipeDirection() -> SwipeDirection? {
+            let (x, y) = (swipeTravel.x, swipeTravel.y)
+            guard max(abs(x), abs(y)) >= model.gestures.swipeDistance else { return nil }
+            if abs(x) > abs(y) { return x < 0 ? .left : .right }
+            return y < 0 ? .up : .down
+        }
+
+        @objc func drag(_ recognizer: UILongPressGestureRecognizer) {
+            switch recognizer.state {
+            case .began:
+                isDragging = true
+                model.beginDrag()
+            case .ended, .cancelled, .failed:
+                endDrag()
+            default:
+                break
+            }
+        }
+
+        func endDrag() {
+            guard isDragging else { return }
+            isDragging = false
+            model.endDrag()
+        }
+
+        /// The pan keeps moving the cursor during a drag; taps stay exclusive so a drop never clicks.
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            (gestureRecognizer is UILongPressGestureRecognizer && other is UIPanGestureRecognizer)
+                || (gestureRecognizer is UIPanGestureRecognizer && other is UILongPressGestureRecognizer)
         }
 
         private func endScroll(coasting: Bool) {

@@ -16,6 +16,14 @@ public enum ScrollPhase: UInt8, Sendable, CaseIterable {
     case momentumEnded = 6
 }
 
+/// The way the fingers moved, not the Space that comes in.
+public enum SwipeDirection: UInt8, Sendable, CaseIterable {
+    case left = 0
+    case right = 1
+    case up = 2
+    case down = 3
+}
+
 /// Trackpad traffic. Key events keep their own untagged two-byte format, so these
 /// carry a leading tag and the two are told apart by payload length.
 public enum PointerEvent: Equatable, Sendable {
@@ -25,6 +33,10 @@ public enum PointerEvent: Equatable, Sendable {
     case click(button: MouseButton, count: UInt8)
     /// Pixel deltas in content direction: positive `dy` reveals content above.
     case scroll(dx: Int16, dy: Int16, phase: ScrollPhase)
+    /// Holds a button down across moves, for dragging.
+    case button(MouseButton, isDown: Bool)
+    /// A three-finger swipe, fired once per gesture.
+    case swipe(SwipeDirection)
 }
 
 extension PointerEvent {
@@ -33,6 +45,9 @@ extension PointerEvent {
         case click = 2
         // 3 is skipped: the legacy `TextChunk` used it in this tag space.
         case scroll = 4
+        case button = 5
+        // 6 is skipped: a two-byte [6, x] would also read as an Enter key event.
+        case swipe = 7
     }
 
     public var encoded: Data {
@@ -56,6 +71,10 @@ extension PointerEvent {
                 UInt8(y & 0xFF), UInt8(y >> 8),
                 phase.rawValue,
             ])
+        case .button(let button, let isDown):
+            return Data([Tag.button.rawValue, button.rawValue, isDown ? 1 : 0])
+        case .swipe(let direction):
+            return Data([Tag.swipe.rawValue, direction.rawValue])
         }
     }
 
@@ -77,6 +96,13 @@ extension PointerEvent {
             let x = UInt16(bytes[1]) | UInt16(bytes[2]) << 8
             let y = UInt16(bytes[3]) | UInt16(bytes[4]) << 8
             self = .scroll(dx: Int16(bitPattern: x), dy: Int16(bitPattern: y), phase: phase)
+        case .button:
+            guard bytes.count == 3, let button = MouseButton(rawValue: bytes[1]), bytes[2] <= 1
+            else { return nil }
+            self = .button(button, isDown: bytes[2] == 1)
+        case .swipe:
+            guard bytes.count == 2, let direction = SwipeDirection(rawValue: bytes[1]) else { return nil }
+            self = .swipe(direction)
         }
     }
 }

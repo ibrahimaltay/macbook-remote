@@ -205,6 +205,15 @@ public final class RemoteClient: NSObject, @unchecked Sendable {
         queue.async { self.enqueueInput(.pointer(.click(button: button, count: count))) }
     }
 
+    /// Reliable, and flushes pending moves first, so a drag's last moves land before the release.
+    public func press(_ button: MouseButton, isDown: Bool) {
+        queue.async { self.enqueueInput(.pointer(.button(button, isDown: isDown))) }
+    }
+
+    public func swipe(_ direction: SwipeDirection) {
+        queue.async { self.enqueueInput(.pointer(.swipe(direction))) }
+    }
+
     /// `changed` and `momentum` deltas are coalesced and sent like cursor moves. The
     /// other phases are sent reliably, since a lost one leaves an app stuck mid-scroll.
     public func scroll(dx: Double, dy: Double, phase: ScrollPhase) {

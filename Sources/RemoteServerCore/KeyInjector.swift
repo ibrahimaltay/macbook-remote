@@ -63,6 +63,34 @@ public struct KeyInjector: @unchecked Sendable {
         post(KeyEvent(command: command, isDown: false))
     }
 
+    /// Ctrl+arrow, the Mission Control shortcuts a three-finger swipe triggers on a
+    /// trackpad. Fingers moving left bring in the Space on the right.
+    public func switchSpace(_ direction: SwipeDirection) {
+        let keyCode: CGKeyCode = switch direction {
+        case .left: 124
+        case .right: 123
+        case .up: 126
+        case .down: 125
+        }
+        // A flags-only Ctrl+arrow leaves Control latched, turning later clicks into Ctrl+clicks.
+        postControl(isDown: true)
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: isDown)
+            else { continue }
+            // Hardware arrows carry Fn and keypad flags; the hotkeys may not match without them.
+            event.flags = [.maskControl, .maskSecondaryFn, .maskNumericPad]
+            event.post(tap: .cghidEventTap)
+        }
+        postControl(isDown: false)
+    }
+
+    private func postControl(isDown: Bool) {
+        guard let event = CGEvent(keyboardEventSource: source, virtualKey: 59, keyDown: isDown) else { return }
+        event.type = .flagsChanged
+        event.flags = isDown ? .maskControl : []
+        event.post(tap: .cghidEventTap)
+    }
+
     /// Types text as if it came from the keyboard.
     public func type(_ text: String) {
         // Return has to be a real key press: apps do not reliably act on a newline

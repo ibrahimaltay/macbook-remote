@@ -23,5 +23,11 @@
       "stopVelocity": 15,
       "maxVelocity": 8000
     }
+  },
+
+  "gestures": {
+    "_help": "swipeDistance: points three fingers travel before a swipe fires. dragHoldSeconds: still hold before a drag picks up.",
+    "swipeDistance": 60,
+    "dragHoldSeconds": 0.5
   }
 }
