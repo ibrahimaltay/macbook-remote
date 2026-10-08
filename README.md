@@ -52,7 +52,7 @@ The iPhone app will be on the App Store soon.
 9. On your Mac, click the LazyRemote icon in the menu bar.
 10. Select **Allow** followed by the name of your iPhone.
 11. Make sure that the iPhone shows the name of your Mac with a green dot.
-12. Swipe left or right to go to the D-pad, trackpad, or keyboard page.
+12. Use the trackpad and the buttons below it to control your Mac. To type, tap **Type to send** and then select the send button.
 
 
 ## License

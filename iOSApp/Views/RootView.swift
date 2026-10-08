@@ -3,99 +3,72 @@ import SwiftUI
 struct RootView: View {
     let model: RemoteViewModel
 
-    @State private var page = 0
-    @State private var drag: CGFloat = 0
     @State private var confirmsForget = false
-
-    private let pageCount = 3
-    /// Narrow enough to sit in the margin beside every page's controls, so a strip
-    /// never steals a touch meant for the trackpad or the text field.
-    private let edgeWidth: CGFloat = 20
+    @State private var inputBarHeight: CGFloat = 0
+    @FocusState private var isTyping: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            GeometryReader { proxy in
-                HStack(spacing: 0) {
-                    DPadView(model: model, pageSwipe: swipe)
-                        .frame(width: proxy.size.width)
-                    TrackpadView(model: model)
-                        .frame(width: proxy.size.width)
-                    TextPageView(model: model, isActive: page == 2, pageSwipe: swipe)
-                        .frame(width: proxy.size.width)
-                }
-                .offset(x: offset(for: proxy.size.width))
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                header
+                TrackpadView(model: model)
+                ControlRow(model: model)
+                    .padding(.horizontal, 20)
             }
+            .padding(.bottom, inputBarHeight)
+            .overlay {
+                if isTyping { scrim }
+            }
+            .animation(.easeOut(duration: 0.2), value: isTyping)
+            // The keyboard covers the controls instead of squeezing them.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+
+            TextInputBar(model: model, isFocused: $isTyping)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                    inputBarHeight = $0
+                }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .overlay(alignment: .leading) { edge }
-        .overlay(alignment: .trailing) { edge }
-        // The pages reach the bottom edge, where a sideways drag would otherwise
+        // The controls reach the bottom edge, where a sideways drag would otherwise
         // flick iOS into another app mid-gesture.
         .defersSystemGestures(on: .bottom)
     }
 
-    /// Paging happens here and nowhere else: the trackpad needs every horizontal
-    /// drag inside it, and the d-pad buttons swallow drags of their own.
-    private var edge: some View {
-        Color.clear
-            .frame(width: edgeWidth)
+    /// Fires on touch-down so a stray touch while typing only dismisses the
+    /// keyboard and never reaches the trackpad or a key.
+    private var scrim: some View {
+        Color.black.opacity(0.4)
             .contentShape(.rect)
-            .gesture(swipe)
+            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in isTyping = false })
+            .transition(.opacity)
     }
 
     private var header: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                StatusLabel(model: model)
-                    .frame(maxWidth: .infinity)
-                Menu {
-                    Button("Reconnect", systemImage: "arrow.clockwise") {
-                        model.reconnect()
-                    }
-                    Button("Forget Mac", systemImage: "trash", role: .destructive) {
-                        confirmsForget = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .frame(width: 32, height: 32)
+        HStack(spacing: 12) {
+            StatusLabel(model: model)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                Button("Reconnect", systemImage: "arrow.clockwise") {
+                    model.reconnect()
                 }
-                .accessibilityLabel("Connection options")
+                Button("Forget Mac", systemImage: "trash", role: .destructive) {
+                    confirmsForget = true
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .frame(width: 32, height: 32)
             }
-            .padding(.horizontal, 16)
-            PageDots(count: pageCount, current: page)
+            .accessibilityLabel("Connection options")
         }
+        .padding(.horizontal, 20)
         .padding(.top, 14)
-        .padding(.bottom, 10)
-        .frame(maxWidth: .infinity)
+        .padding(.bottom, 14)
         .confirmationDialog("Forget this Mac?", isPresented: $confirmsForget, titleVisibility: .visible) {
             Button("Forget Mac", role: .destructive) { model.forgetMac() }
         } message: {
             Text("The saved Mac identity will be removed. Only reconnect to a Mac you trust.")
         }
-    }
-
-    private var swipe: some Gesture {
-        DragGesture()
-            .onChanged { drag = $0.translation.width }
-            .onEnded { value in
-                let travel = value.translation.width + value.predictedEndTranslation.width
-                withAnimation(.snappy(duration: 0.3)) {
-                    if travel < -80 {
-                        page = min(page + 1, pageCount - 1)
-                    } else if travel > 80 {
-                        page = max(page - 1, 0)
-                    }
-                    drag = 0
-                }
-            }
-    }
-
-    private func offset(for width: CGFloat) -> CGFloat {
-        let settled = -CGFloat(page) * width
-        return min(max(settled + drag, -CGFloat(pageCount - 1) * width), 0)
     }
 }
 
@@ -111,21 +84,5 @@ struct StatusLabel: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-    }
-}
-
-private struct PageDots: View {
-    let count: Int
-    let current: Int
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<count, id: \.self) { index in
-                Circle()
-                    .fill(index == current ? Color.primary : Color.secondary.opacity(0.3))
-                    .frame(width: 7, height: 7)
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: current)
     }
 }
