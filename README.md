@@ -8,6 +8,32 @@ Use your iPhone as a remote for your Mac, over Bluetooth.
 
 **[Website](https://ibrahimaltay.github.io/macbook-remote/)** · **[Download for Mac](https://github.com/ibrahimaltay/macbook-remote/releases/latest)** · iPhone app coming soon to the App Store
 
+## See It in Action
+
+### Trackpad
+
+Move your Mac's cursor and click from your iPhone.
+
+![Using the iPhone trackpad to control the Mac cursor](readme-gifs/trackpad.gif)
+
+### Arrow Keys
+
+Navigate on your Mac with the iPhone's arrow controls.
+
+![Controlling the Mac with the iPhone arrow keys](readme-gifs/arrow-keys.gif)
+
+### Play / Pause
+
+Pause and resume playback without reaching for your Mac.
+
+![Pausing and resuming Mac playback from the iPhone](readme-gifs/play-pause.gif)
+
+### Keyboard
+
+Type on your iPhone and send the text straight to your Mac.
+
+![Sending text from the iPhone keyboard to the Mac](readme-gifs/keyboard.gif)
+
 ## Screenshot
 
 <p>
