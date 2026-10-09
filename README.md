@@ -34,12 +34,6 @@ Type on your iPhone and send the text straight to your Mac.
 
 ![Sending text from the iPhone keyboard to the Mac](readme-gifs/keyboard.gif)
 
-## Screenshot
-
-<p>
-  <img src="docs/screenshots/remote.png" width="240" alt="LazyRemote with a trackpad, arrow keys, play/pause and a text field">
-</p>
-
 ## Features
 
 - **Arrow keys & play/pause:** control videos and presentations without leaving your seat.
