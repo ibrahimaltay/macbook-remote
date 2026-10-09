@@ -22,6 +22,28 @@
   <div id="__bundler_thumbnail"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect x="450" y="120" width="300" height="560" rx="48" fill="#fff"></rect><circle cx="600" cy="400" r="70" fill="#0071e3"></circle></svg></div>
   <div id="__bundler_loading">Unpacking...</div>
 
+  <template id="app-demos">
+    <section aria-labelledby="demo-heading" style="margin:2.5rem 0 0">
+      <h2 id="demo-heading" style="font-size:1.4rem;margin:0 0 1rem">See It in Action</h2>
+      <figure style="margin:0 0 1.75rem">
+        <figcaption style="margin:0 0 0.5rem;font-weight:600">Trackpad</figcaption>
+        <img src="readme-gifs/trackpad.gif" width="960" height="540" alt="Using the iPhone trackpad to control the Mac cursor" decoding="async" style="display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:8px">
+      </figure>
+      <figure style="margin:0 0 1.75rem">
+        <figcaption style="margin:0 0 0.5rem;font-weight:600">Arrow Keys</figcaption>
+        <img src="readme-gifs/arrow-keys.gif" width="960" height="540" alt="Controlling the Mac with the iPhone arrow keys" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:8px">
+      </figure>
+      <figure style="margin:0 0 1.75rem">
+        <figcaption style="margin:0 0 0.5rem;font-weight:600">Play / Pause</figcaption>
+        <img src="readme-gifs/play-pause.gif" width="960" height="540" alt="Pausing and resuming Mac playback from the iPhone" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:8px">
+      </figure>
+      <figure style="margin:0">
+        <figcaption style="margin:0 0 0.5rem;font-weight:600">Keyboard</figcaption>
+        <img src="readme-gifs/keyboard.gif" width="960" height="540" alt="Sending text from the iPhone keyboard to the Mac" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:8px">
+      </figure>
+    </section>
+  </template>
+
   <script>
     
 document.addEventListener('DOMContentLoaded', async function() {
@@ -67,6 +89,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const manifest = JSON.parse(manifestEl.textContent);
     let template = JSON.parse(templateEl.textContent);
+    const demos = document.getElementById('app-demos');
+    const featuresHeading = '<h2 style="font-size:1.4rem;margin:2.5rem 0 0.5rem">Features</h2>';
+    if (!demos || !template.includes(featuresHeading)) {
+      throw new Error('Missing homepage demo insertion point');
+    }
+    template = template.replace(featuresHeading, demos.innerHTML + featuresHeading);
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
     // document's manifest; frame srcs carry an about:blank#<uuid> marker
@@ -308,6 +336,23 @@ document.addEventListener('DOMContentLoaded', async function() {
     // createElement so they execute, awaiting onload for src scripts to
     // preserve ordering (React before ReactDOM before Babel before text/babel).
     const doc = new DOMParser().parseFromString(template, 'text/html');
+    doc.querySelector('main[data-screen-label="Home"] img[alt="LazyRemote with a trackpad, arrow keys, play/pause and a text field"]')?.remove();
+    const macDownload = doc.querySelector('a[href$="/LazyRemote.dmg"]');
+    const downloads = macDownload.parentElement;
+    downloads.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;width:100%;align-items:start';
+    macDownload.style.height = '4.5rem';
+    macDownload.style.width = '100%';
+    macDownload.style.maxWidth = '13.5rem';
+    macDownload.style.justifyContent = 'center';
+    macDownload.style.padding = '0 0.75rem';
+    macDownload.querySelector('svg').setAttribute('width', '28');
+    macDownload.querySelector('svg').setAttribute('height', '28');
+    macDownload.querySelector('span > span').style.fontSize = '1.4rem';
+    const appStoreImage = downloads.querySelector('img[alt="App Store, coming soon"]');
+    const appStoreBadge = appStoreImage.parentElement;
+    appStoreBadge.style.cssText = 'position:relative;display:block;width:100%;max-width:13.5rem;aspect-ratio:3/1;border-radius:9px;overflow:hidden';
+    appStoreImage.style.cssText = 'display:block;width:100%;height:auto';
+    appStoreBadge.parentElement.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:0.5rem;min-width:0;cursor:default';
     document.documentElement.replaceWith(doc.documentElement);
 
     // Resolve page-frame markers: mint this document's own blob for each
