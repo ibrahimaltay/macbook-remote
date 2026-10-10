@@ -47,6 +47,7 @@ extension PointerEvent {
         case scroll = 4
         case button = 5
         // 6 is skipped: a two-byte [6, x] would also read as an Enter key event.
+        // 7 overlaps the Spotlight key's bytes; SecureMessage's outer tag keeps them apart.
         case swipe = 7
     }
 

@@ -64,6 +64,9 @@ final class SecureMessageTests: XCTestCase {
         XCTAssertEqual(try SecureMessage.textResult(id: 0x0102030405060708, success: false).encoded(), Data([8, 1, 2, 3, 4, 5, 6, 7, 8, 0]))
         let event = PointerEvent.move(dx: -2, dy: 300)
         XCTAssertEqual(try SecureMessage.pointer(event).encoded(), Data([2]) + event.encoded)
+        // Spotlight and swipe share inner bytes [7, 1]; only the outer tag separates them.
+        XCTAssertEqual(try SecureMessage(wire: Data([1, 7, 1])), .key(KeyEvent(command: .spotlight, isDown: true)))
+        XCTAssertEqual(try SecureMessage(wire: Data([2, 7, 1])), .pointer(.swipe(.right)))
     }
 
     func testStrictParsingAndLengths() {

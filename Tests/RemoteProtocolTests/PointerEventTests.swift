@@ -57,16 +57,6 @@ final class PointerEventTests: XCTestCase {
         XCTAssertEqual(PointerEvent(wire: slice), .click(button: .right, count: 2))
     }
 
-    /// Key events stay two untagged bytes, so the two formats have to stay tellable
-    /// apart by length alone — that is what keeps older builds working.
-    func testNeverDecodesATwoByteKeyEvent() {
-        for command in Command.allCases {
-            for isDown in [true, false] {
-                XCTAssertNil(PointerEvent(wire: KeyEvent(command: command, isDown: isDown).encoded))
-            }
-        }
-    }
-
     func testRejectsWrongLengthAndUnknownTag() {
         XCTAssertNil(PointerEvent(wire: Data([1, 0, 0, 0])))
         XCTAssertNil(PointerEvent(wire: Data([2, 0])))

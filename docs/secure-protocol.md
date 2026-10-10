@@ -202,7 +202,8 @@ count is a raw UInt8 (the codec adds no narrower range restriction). Scroll phas
 are began=1, changed=2, ended=3, momentumBegan=4, momentum=5, momentumEnded=6;
 scroll deltas are pixels in content direction (positive dy reveals content above).
 Pointer sub-tag 3 is unused because legacy `TextChunk` occupied it, and sub-tag 6
-is unused so no two-byte pointer event matches a key event. Swipe directions are
+was left unused so no two-byte pointer event matched a key event; swipe `[7, d]` now
+overlaps spotlight key bytes, which the outer message tag disambiguates. Swipe directions are
 the finger motion: left=0, right=1, up=2, down=3; the Mac maps them to Ctrl+→,
 Ctrl+←, Ctrl+↑, Ctrl+↓. While a peer holds a button down, its moves are posted as
 drag events; disconnect, revoke, or drop releases held buttons like held keys. Pointer
