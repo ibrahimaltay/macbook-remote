@@ -95,7 +95,7 @@ or already completed. Developer ID signing, hardened runtime, and notarization f
 Mac distribution still need release validation.
 
 The website is static HTML/CSS in `site/`, deployed to GitHub Pages by
-`.github/workflows/pages.yml` (https://ibrahimaltay.github.io/macbook-remote/). It
+`.github/workflows/pages.yml` (https://ibrahimaltay.github.io/lazy-remote-for-desktop/). It
 hosts the App Store Privacy and Support URLs. Its download button points to
 `releases/latest/download/LazyRemote.dmg`, so every release must attach the
 unversioned `LazyRemote.dmg` that `scripts/release-mac.sh` produces. Keep

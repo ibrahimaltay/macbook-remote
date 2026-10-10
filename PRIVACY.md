@@ -2,7 +2,7 @@
 
 _Last updated: October 5, 2026_
 
-The canonical copy of this policy is at https://ibrahimaltay.github.io/macbook-remote/privacy.html.
+The canonical copy of this policy is at https://ibrahimaltay.github.io/lazy-remote-for-desktop/privacy.html.
 
 LazyRemote does not collect, store, or share any personal data.
 
@@ -20,4 +20,4 @@ If this policy changes, the updated version will be posted at this URL.
 ## Contact
 
 Questions about this policy can be submitted as an issue at
-https://github.com/ibrahimaltay/macbook-remote/issues.
+https://github.com/ibrahimaltay/lazy-remote-for-desktop/issues.

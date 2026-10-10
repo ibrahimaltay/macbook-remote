@@ -6,7 +6,7 @@ Use your iPhone as a remote for your Mac, over Bluetooth.
 ![iOS 17+](https://img.shields.io/badge/iOS-17%2B-black)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black)
 
-**[Website](https://ibrahimaltay.github.io/macbook-remote/)** · **[Download for Mac](https://github.com/ibrahimaltay/macbook-remote/releases/latest)** · iPhone app coming soon to the App Store
+**[Website](https://ibrahimaltay.github.io/lazy-remote-for-desktop/)** · **[Download for Mac](https://github.com/ibrahimaltay/lazy-remote-for-desktop/releases/latest)** · iPhone app coming soon to the App Store
 
 ## See It in Action
 
@@ -51,7 +51,7 @@ The iPhone app will be on the App Store soon.
 
 ### Mac
 
-1. Download `LazyRemote.dmg` from the [latest release](https://github.com/ibrahimaltay/macbook-remote/releases/latest).
+1. Download `LazyRemote.dmg` from the [latest release](https://github.com/ibrahimaltay/lazy-remote-for-desktop/releases/latest).
 2. Open `LazyRemote.dmg`.
 3. Drag **LazyRemote** into the **Applications** folder.
 
