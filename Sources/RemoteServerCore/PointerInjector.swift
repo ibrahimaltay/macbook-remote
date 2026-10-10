@@ -10,14 +10,20 @@ public struct PointerInjector: @unchecked Sendable {
         source = CGEventSource(stateID: .hidSystemState)
     }
 
-    public func post(_ event: PointerEvent) {
+    /// `holding` is the button some phone keeps pressed, which turns moves into drags.
+    public func post(_ event: PointerEvent, holding: MouseButton? = nil) {
         switch event {
         case .move(let dx, let dy):
-            move(dx: CGFloat(dx), dy: CGFloat(dy))
+            move(dx: CGFloat(dx), dy: CGFloat(dy), holding: holding)
         case .click(let button, let count):
             click(button, count: count)
         case .scroll(let dx, let dy, let phase):
             scroll(dx: Int32(dx), dy: Int32(dy), phase: phase)
+        case .button(let button, let isDown):
+            press(button, isDown: isDown)
+        case .swipe:
+            // A keyboard shortcut, so `RemoteServer` hands it to `KeyInjector`.
+            break
         }
     }
 
@@ -27,13 +33,18 @@ public struct PointerInjector: @unchecked Sendable {
         CGEvent(source: nil)?.location ?? .zero
     }
 
-    private func move(dx: CGFloat, dy: CGFloat) {
+    private func move(dx: CGFloat, dy: CGFloat, holding: MouseButton?) {
         let target = Self.clamp(CGPoint(x: location.x + dx, y: location.y + dy))
+        let type: CGEventType = switch holding {
+        case .left: .leftMouseDragged
+        case .right: .rightMouseDragged
+        case nil: .mouseMoved
+        }
         guard let event = CGEvent(
             mouseEventSource: source,
-            mouseType: .mouseMoved,
+            mouseType: type,
             mouseCursorPosition: target,
-            mouseButton: .left
+            mouseButton: holding == .right ? .right : .left
         ) else { return }
 
         // Games and 3D tools read these fields rather than the cursor position.
@@ -63,6 +74,23 @@ public struct PointerInjector: @unchecked Sendable {
                 event.post(tap: .cghidEventTap)
             }
         }
+    }
+
+    private func press(_ button: MouseButton, isDown: Bool) {
+        let type: CGEventType = switch (button, isDown) {
+        case (.left, true): .leftMouseDown
+        case (.left, false): .leftMouseUp
+        case (.right, true): .rightMouseDown
+        case (.right, false): .rightMouseUp
+        }
+        guard let event = CGEvent(
+            mouseEventSource: source,
+            mouseType: type,
+            mouseCursorPosition: location,
+            mouseButton: button == .right ? .right : .left
+        ) else { return }
+        event.setIntegerValueField(.mouseEventClickState, value: 1)
+        event.post(tap: .cghidEventTap)
     }
 
     /// Continuous pixel scrolling with the phases a real trackpad reports, so apps

@@ -130,6 +130,25 @@ final class RemoteViewModel {
         client.click(button, count: count)
     }
 
+    var gestures: TrackpadTuning.Gestures { tuning.gestures }
+
+    func swipe(_ direction: SwipeDirection) {
+        guard isConnected else { return }
+        haptics.impactOccurred()
+        client.swipe(direction)
+    }
+
+    func beginDrag() {
+        guard isConnected else { return }
+        haptics.impactOccurred()
+        client.press(.left, isDown: true)
+    }
+
+    /// Not gated on the connection: a release must never be skipped.
+    func endDrag() {
+        client.press(.left, isDown: false)
+    }
+
     func send(text: String) {
         guard textStatus != .sending else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
