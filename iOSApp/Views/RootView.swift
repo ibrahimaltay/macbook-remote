@@ -5,7 +5,7 @@ struct RootView: View {
 
     @State private var confirmsForget = false
     @State private var inputBarHeight: CGFloat = 0
-    // shortcut: the phone can't see Spotlight, so this assumes it closes with the keyboard.
+    // shortcut: the phone can't see Spotlight, so this assumes it opens and closes with the keyboard.
     @State private var isSpotlight = false
     @FocusState private var isTyping: Bool
     @AppStorage("remoteFab.docked") private var isRemoteDocked = false
@@ -51,7 +51,10 @@ struct RootView: View {
             }
         }
         .onChange(of: isTyping) { _, typing in
-            if !typing { isSpotlight = false }
+            guard !typing, isSpotlight else { return }
+            isSpotlight = false
+            // Sent text leaves Spotlight open on its results; otherwise Cmd+Space again closes it.
+            if model.textStatus != .sending { model.tap(.spotlight, feedback: false) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .coordinateSpace(.named("root"))
