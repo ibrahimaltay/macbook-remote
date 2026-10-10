@@ -184,6 +184,8 @@ strings occupy the remaining bytes as nonempty valid UTF-8, without a length fie
 | 2 pointer move | `[1] + dxInt16LE + dyInt16LE` | 6 | clientInput |
 | 2 pointer click | `[2] + button1 + count1` | 4 | clientInput |
 | 2 pointer scroll | `[4] + dxInt16LE + dyInt16LE + phase1` | 7 | clientInput |
+| 2 pointer button | `[5] + button1 + isDown1 (0 or 1)` | 4 | clientInput |
+| 2 pointer swipe | `[7] + direction1` | 3 | clientInput |
 | 3 text | textID8 + UTF-8 (1..4096 bytes) | 10..4105 | clientInput |
 | 4 name | UTF-8 (1..128 bytes) | 2..129 | clientControl |
 | 5 pending | None | 1 | serverControl |
@@ -199,7 +201,11 @@ release. Pointer buttons are left=0, right=1;
 count is a raw UInt8 (the codec adds no narrower range restriction). Scroll phases
 are began=1, changed=2, ended=3, momentumBegan=4, momentum=5, momentumEnded=6;
 scroll deltas are pixels in content direction (positive dy reveals content above).
-Pointer sub-tag 3 is unused because legacy `TextChunk` occupied it. Pointer
+Pointer sub-tag 3 is unused because legacy `TextChunk` occupied it, and sub-tag 6
+is unused so no two-byte pointer event matches a key event. Swipe directions are
+the finger motion: left=0, right=1, up=2, down=3; the Mac maps them to Ctrl+→,
+Ctrl+←, Ctrl+↑, Ctrl+↓. While a peer holds a button down, its moves are posted as
+drag events; disconnect, revoke, or drop releases held buttons like held keys. Pointer
 deltas are signed little-endian, unlike record/frame/text IDs. Unknown tags,
 invalid lengths, invalid UTF-8, and invalid command/button/boolean values fail.
 Only key, pointer, and text messages are accepted by the approved input decoder.
@@ -283,7 +289,7 @@ no new wire message or plaintext fallback.
 
 ## Delivery, Limits, and Lifecycle
 
-Keys, clicks, text, and client control/handshake frames use `.withResponse` with
+Keys, clicks, buttons, swipes, text, and client control/handshake frames use `.withResponse` with
 one outstanding write, checked callbacks, and serialized record frames. This
 provides reliable ATT transport, not proof of foreground event delivery. Pointer
 movement is coalesced, fractional deltas retained, and pending axes clamped to

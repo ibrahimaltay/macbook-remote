@@ -34,8 +34,14 @@ public struct TrackpadTuning: Decodable, Sendable, Equatable {
         }
     }
 
+    public struct Gestures: Decodable, Sendable, Equatable {
+        public var swipeDistance: Double
+        public var dragHoldSeconds: Double
+    }
+
     public var cursor: Gain
     public var scroll: Scroll
+    public var gestures: Gestures
 
     public static let bundled: TrackpadTuning = {
         guard let url = Bundle.module.url(forResource: "TrackpadTuning", withExtension: "json") else {

@@ -16,6 +16,10 @@ func usage() -> Never {
           Default COMMAND is RIGHT, default delay is 3 seconds so you can
           switch to the app you want to test against.
 
+      remotectl swipe left|right|up|down [--delay SECONDS]
+          Post the shortcut a three-finger swipe sends (Ctrl+arrow). Needs
+          Accessibility. Default delay is 1 second.
+
       remotectl serve [--allow-new]
           Advertise over Bluetooth and press keys for approved devices.
           --allow-new approves whatever connects, for testing.
@@ -79,6 +83,23 @@ case "keytest":
     Thread.sleep(forTimeInterval: delay)
     KeyInjector().tap(command)
     print("sent")
+
+case "swipe":
+    requireBundledApp()
+    requireAccessibility()
+
+    var rest = Array(arguments.dropFirst())
+    var delay: TimeInterval = 1
+    if let flag = rest.firstIndex(of: "--delay"), rest.indices.contains(flag + 1) {
+        delay = TimeInterval(rest[flag + 1]) ?? 1
+        rest.removeSubrange(flag...(flag + 1))
+    }
+    let directions: [String: SwipeDirection] = ["left": .left, "right": .right, "up": .up, "down": .down]
+    guard let name = rest.first, let direction = directions[name.lowercased()] else { usage() }
+
+    Thread.sleep(forTimeInterval: delay)
+    KeyInjector().switchSpace(direction)
+    print("swiped \(name)")
 
 case "serve":
     requireBundledApp()

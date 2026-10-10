@@ -22,6 +22,8 @@ final class TrackpadTuningTests: XCTestCase {
         XCTAssertGreaterThan(momentum.stopVelocity, 0)
         XCTAssertGreaterThanOrEqual(momentum.minStartVelocity, momentum.stopVelocity)
         XCTAssertGreaterThanOrEqual(momentum.maxVelocity, momentum.minStartVelocity)
+        XCTAssertGreaterThan(tuning.gestures.swipeDistance, 0)
+        XCTAssertGreaterThan(tuning.gestures.dragHoldSeconds, 0)
     }
 
     func testGainRampsWithFingerSpeedUpToTheCap() {

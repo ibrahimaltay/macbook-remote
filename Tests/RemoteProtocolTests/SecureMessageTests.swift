@@ -45,6 +45,18 @@ final class SecureMessageTests: XCTestCase {
             XCTAssertEqual(try message.encoded().count, 7)
             XCTAssertEqual(try SecureMessage(wire: message.encoded()), message)
         }
+        for button in [MouseButton.left, .right] {
+            for isDown in [false, true] {
+                let message = SecureMessage.pointer(.button(button, isDown: isDown))
+                XCTAssertEqual(try message.encoded().count, 4)
+                XCTAssertEqual(try SecureMessage(wire: message.encoded()), message)
+            }
+        }
+        for direction in SwipeDirection.allCases {
+            let message = SecureMessage.pointer(.swipe(direction))
+            XCTAssertEqual(try message.encoded().count, 3)
+            XCTAssertEqual(try SecureMessage(wire: message.encoded()), message)
+        }
     }
 
     func testBinaryIDsAndInnerCodecs() throws {
@@ -60,6 +72,8 @@ final class SecureMessageTests: XCTestCase {
             [1, 99, 1], [1, 0, 1, 0], [2], [2, 1, 0, 0, 0],
             [2, 1, 0, 0, 0, 0, 0], [2, 2, 2, 1], [2, 3, 0, 1],
             [2, 4, 0, 0, 0, 0], [2, 4, 0, 0, 0, 0, 0], [2, 4, 0, 0, 0, 0, 1, 0],
+            [2, 5, 0], [2, 5, 0, 2], [2, 5, 2, 1], [2, 5, 0, 1, 0],
+            [2, 6, 0], [2, 7], [2, 7, 4], [2, 7, 0, 0],
             [3], [3, 0, 0, 0, 0, 0, 0, 0, 0], [4],
             [8], [8, 0, 0, 0, 0, 0, 0, 0, 0],
             [8, 0, 0, 0, 0, 0, 0, 0, 0, 2],

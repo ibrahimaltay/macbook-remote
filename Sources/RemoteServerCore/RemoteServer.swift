@@ -49,6 +49,7 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
         var notificationProgress: TimeInterval?
         var frameCounter: UInt64 = 0
         var held = Set<Command>()
+        var heldButtons = Set<MouseButton>()
 
         init(central: CBCentral) {
             self.central = central
@@ -322,8 +323,12 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
             switch message {
             case .key(let event):
                 accept(event, from: peer)
+            case .pointer(.swipe(let direction)):
+                injector.switchSpace(direction)
+            case .pointer(.button(let button, let isDown)):
+                accept(button, isDown: isDown, from: peer)
             case .pointer(let event):
-                pointer.post(event)
+                pointer.post(event, holding: heldButton)
             case .text(let id, let value):
                 injector.type(value)
                 try send(.textResult(id: id, success: true), to: peer)
@@ -398,12 +403,38 @@ public final class RemoteServer: NSObject, @unchecked Sendable {
         DispatchQueue.main.async { self.onEvent?(event) }
     }
 
+    private func accept(_ button: MouseButton, isDown: Bool, from peer: Peer) {
+        if isDown {
+            peer.heldButtons.insert(button)
+            pointer.post(.button(button, isDown: true))
+        } else {
+            guard peer.heldButtons.remove(button) != nil else { return }
+            if !peers.values.contains(where: { $0.approved && $0.heldButtons.contains(button) }) {
+                pointer.post(.button(button, isDown: false))
+            }
+        }
+    }
+
+    private var heldButton: MouseButton? {
+        let held = peers.values.filter(\.approved).reduce(into: Set<MouseButton>()) {
+            $0.formUnion($1.heldButtons)
+        }
+        return held.contains(.left) ? .left : held.first
+    }
+
     private func releaseHeld(_ peer: Peer) {
         let held = peer.held
         peer.held.removeAll()
         for command in held {
             if !peers.values.contains(where: { $0 !== peer && $0.approved && $0.held.contains(command) }) {
                 injector.post(KeyEvent(command: command, isDown: false))
+            }
+        }
+        let buttons = peer.heldButtons
+        peer.heldButtons.removeAll()
+        for button in buttons {
+            if !peers.values.contains(where: { $0 !== peer && $0.approved && $0.heldButtons.contains(button) }) {
+                pointer.post(.button(button, isDown: false))
             }
         }
     }
