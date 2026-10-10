@@ -9,6 +9,7 @@ public enum Command: UInt8, CaseIterable, Sendable {
     case mid = 4
     case backspace = 5
     case enter = 6
+    case spotlight = 7
 }
 
 /// A press or a release of one button.
@@ -48,6 +49,7 @@ extension Command {
         case .mid: "MID"
         case .backspace: "BACKSPACE"
         case .enter: "ENTER"
+        case .spotlight: "SPOTLIGHT"
         }
     }
 

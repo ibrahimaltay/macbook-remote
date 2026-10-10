@@ -3,13 +3,14 @@ import SwiftUI
 struct TextInputBar: View {
     let model: RemoteViewModel
     @FocusState.Binding var isFocused: Bool
+    var isSpotlight = false
 
     @State private var draft = ""
     @State private var repeatTask: Task<Void, Never>?
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Type to send…", text: $draft, axis: .vertical)
+            TextField(text: $draft, prompt: prompt, axis: .vertical) {}
                 .lineLimit(1...5)
                 .focused($isFocused)
                 .padding(.horizontal, 16)
@@ -51,6 +52,12 @@ struct TextInputBar: View {
             if status == .sent { draft = "" }
         }
         .onDisappear(perform: stopDeleting)
+    }
+
+    private var prompt: Text {
+        isSpotlight
+            ? Text("\(Image(systemName: "magnifyingglass")) Spotlight Search")
+            : Text("Type to send…")
     }
 
     private func send() {

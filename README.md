@@ -39,6 +39,7 @@ Type on your iPhone and send the text straight to your Mac.
 - **Arrow keys & play/pause:** control videos and presentations without leaving your seat.
 - **Trackpad:** move the cursor; tap to click, two-finger double-tap to right-click.
 - **Keyboard:** type on your iPhone and send the text straight to your Mac.
+- **Spotlight:** opens Spotlight on your Mac by sending ⌘ Space, then type your search from the iPhone. A custom Spotlight shortcut isn't supported.
 - **Direct and encrypted:** connects over Bluetooth, with no Wi-Fi setup or accounts.
 - **Free:** no ads, no tracking, no in-app purchases.
 

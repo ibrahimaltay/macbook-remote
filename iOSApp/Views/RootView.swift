@@ -5,6 +5,8 @@ struct RootView: View {
 
     @State private var confirmsForget = false
     @State private var inputBarHeight: CGFloat = 0
+    // shortcut: the phone can't see Spotlight, so this assumes it closes with the keyboard.
+    @State private var isSpotlight = false
     @FocusState private var isTyping: Bool
 
     var body: some View {
@@ -23,10 +25,13 @@ struct RootView: View {
             // The keyboard covers the controls instead of squeezing them.
             .ignoresSafeArea(.keyboard, edges: .bottom)
 
-            TextInputBar(model: model, isFocused: $isTyping)
+            TextInputBar(model: model, isFocused: $isTyping, isSpotlight: isSpotlight)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                     inputBarHeight = $0
                 }
+        }
+        .onChange(of: isTyping) { _, typing in
+            if !typing { isSpotlight = false }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
@@ -48,6 +53,16 @@ struct RootView: View {
         HStack(spacing: 12) {
             StatusLabel(model: model)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                model.tap(.spotlight)
+                isSpotlight = true
+                isTyping = true
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .frame(width: 32, height: 32)
+            }
+            .disabled(!model.isConnected)
+            .accessibilityLabel("Spotlight Search")
             Menu {
                 Button("Reconnect", systemImage: "arrow.clockwise") {
                     model.reconnect()

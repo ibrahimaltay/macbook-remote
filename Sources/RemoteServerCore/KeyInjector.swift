@@ -12,13 +12,14 @@ extension Command {
         case .mid: 49
         case .backspace: 51
         case .enter: 36
+        case .spotlight: 49
         }
     }
 
     var isArrow: Bool {
         switch self {
         case .up, .down, .left, .right: true
-        case .mid, .backspace, .enter: false
+        case .mid, .backspace, .enter, .spotlight: false
         }
     }
 }
@@ -45,6 +46,10 @@ public struct KeyInjector: @unchecked Sendable {
     }
 
     public func post(_ event: KeyEvent) {
+        if event.command == .spotlight {
+            if event.isDown { openSpotlight() }
+            return
+        }
         guard let cgEvent = CGEvent(
             keyboardEventSource: source,
             virtualKey: event.command.keyCode,
@@ -75,6 +80,24 @@ public struct KeyInjector: @unchecked Sendable {
                 post(chunk)
             }
         }
+    }
+
+    /// Cmd+Space, the default shortcut; a custom Spotlight shortcut is not supported.
+    private func openSpotlight() {
+        // A real Command press, not just a flag, or the modifier latches in HID state.
+        let commandDown = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: true)
+        let commandUp = CGEvent(keyboardEventSource: source, virtualKey: 55, keyDown: false)
+        commandDown?.type = .flagsChanged
+        commandDown?.flags = .maskCommand
+        commandUp?.type = .flagsChanged
+        commandUp?.flags = []
+        commandDown?.post(tap: .cghidEventTap)
+        for isDown in [true, false] {
+            let space = CGEvent(keyboardEventSource: source, virtualKey: 49, keyDown: isDown)
+            space?.flags = .maskCommand
+            space?.post(tap: .cghidEventTap)
+        }
+        commandUp?.post(tap: .cghidEventTap)
     }
 
     private func tapReturn() {
