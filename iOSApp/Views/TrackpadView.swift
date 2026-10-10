@@ -84,7 +84,7 @@ private struct TrackpadSurface: UIViewRepresentable {
         }
 
         private let model: RemoteViewModel
-        private var lastClick: (time: TimeInterval, point: CGPoint)?
+        private var lastClick: (time: TimeInterval, point: CGPoint, count: UInt8)?
         private var panMode = PanMode.cursor
         private var swipeTravel = CGPoint.zero
         private var isDragging = false
@@ -92,8 +92,8 @@ private struct TrackpadSurface: UIViewRepresentable {
         private var momentum: ScrollMomentum?
         private var displayLink: CADisplayLink?
 
-        private static let doubleClickInterval: TimeInterval = 0.4
-        private static let doubleClickSlop: CGFloat = 40
+        private static let multiClickInterval: TimeInterval = 0.4
+        private static let multiClickSlop: CGFloat = 40
 
         init(model: RemoteViewModel) {
             self.model = model
@@ -217,16 +217,17 @@ private struct TrackpadSurface: UIViewRepresentable {
             let point = recognizer.location(in: view)
             let now = ProcessInfo.processInfo.systemUptime
 
-            // Send the click now and let the count say it was the second one, the way a
-            // real trackpad does. Waiting to see if a second tap lands would put a
+            // Send the click now and let the count say it was the second or third one, the
+            // way a real trackpad does. Waiting to see if another tap lands would put a
             // quarter of a second on every single click.
-            let isSecond = lastClick.map {
-                now - $0.time < Self.doubleClickInterval
-                    && hypot(point.x - $0.point.x, point.y - $0.point.y) < Self.doubleClickSlop
-            } ?? false
+            let count: UInt8 = lastClick.flatMap {
+                now - $0.time < Self.multiClickInterval
+                    && hypot(point.x - $0.point.x, point.y - $0.point.y) < Self.multiClickSlop
+                    && $0.count < 3 ? $0.count + 1 : nil
+            } ?? 1
 
-            lastClick = isSecond ? nil : (now, point)
-            model.click(.left, count: isSecond ? 2 : 1)
+            lastClick = (now, point, count)
+            model.click(.left, count: count)
         }
 
         @objc func rightClick(_ recognizer: UITapGestureRecognizer) {
