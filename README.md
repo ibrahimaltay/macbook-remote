@@ -12,27 +12,63 @@ Use your iPhone as a remote for your Mac, over Bluetooth.
 
 ### Trackpad
 
-Move your Mac's cursor and click from your iPhone.
+Move the cursor with one finger.
 
-![Using the iPhone trackpad to control the Mac cursor](readme-gifs/trackpad.gif)
+![Moving the Mac cursor with one finger on the iPhone](readme-gifs/trackpad-move.gif)
 
-### Arrow Keys
+Tap to click. Double-tap and triple-tap work too.
 
-Navigate on your Mac with the iPhone's arrow controls.
+![Tapping the iPhone trackpad to click on the Mac](readme-gifs/tap-click.gif)
 
-![Controlling the Mac with the iPhone arrow keys](readme-gifs/arrow-keys.gif)
+Two-finger double-tap to right-click.
 
-### Play / Pause
+![Two-finger double-tap on the iPhone opening a right-click menu on the Mac](readme-gifs/right-click.gif)
 
-Pause and resume playback without reaching for your Mac.
+Two-finger scroll, with smooth momentum.
 
-![Pausing and resuming Mac playback from the iPhone](readme-gifs/play-pause.gif)
+![Scrolling a Mac window with two fingers on the iPhone](readme-gifs/scroll.gif)
+
+Long-press, then move, to drag.
+
+![Dragging an item on the Mac with a long-press on the iPhone](readme-gifs/drag.gif)
+
+Swipe with three fingers to switch desktops, open Mission Control or show all windows of an app.
+
+![Three-finger swipe on the iPhone switching Mac desktops](readme-gifs/three-finger-swipe.gif)
+
+### Floating Remote
+
+A floating remote button you can place anywhere on the screen, or dock in the top bar.
+
+![Moving and docking the floating remote button on the iPhone](readme-gifs/floating-remote.gif)
+
+Tap it for a big circular D-pad. Use the arrow keys to move through slides, menus and videos. Hold one to repeat it.
+
+![Using the iPhone D-pad arrow keys to navigate on the Mac](readme-gifs/dpad-arrows.gif)
+
+Play/Pause in the center.
+
+![Pausing and resuming Mac playback from the iPhone D-pad](readme-gifs/play-pause.gif)
 
 ### Keyboard
 
 Type on your iPhone and send the text straight to your Mac.
 
 ![Sending text from the iPhone keyboard to the Mac](readme-gifs/keyboard.gif)
+
+Works in any language, emoji included.
+
+![Sending text in several languages and emoji to the Mac](readme-gifs/any-language.gif)
+
+Backspace and Enter buttons. Hold Backspace to delete quickly.
+
+![Using the Backspace and Enter buttons on the iPhone](readme-gifs/backspace-enter.gif)
+
+### Spotlight
+
+Tap the magnifier to open Spotlight on your Mac, then type your search from the iPhone.
+
+![Opening Spotlight on the Mac and searching from the iPhone](readme-gifs/spotlight.gif)
 
 ## Features
 
